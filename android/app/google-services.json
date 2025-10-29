@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "421050880025",
+    "project_id": "student-wellness-app-34f4c",
+    "storage_bucket": "student-wellness-app-34f4c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:421050880025:android:c3c1f5362c76ac1c00da88",
+        "android_client_info": {
+          "package_name": "com.example.student_mental_wellness"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPzSvzWcTYUx6gtE2UDWyQ53UqStyY4Mc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
