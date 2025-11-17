@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../../services/hive_service.dart';
 import '../../services/ml_service.dart';
 import '../../models/journal_entry.dart';
-import '../../widgets/gradient_card.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
@@ -22,12 +20,12 @@ class _JournalPageState extends State<JournalPage>
   final _ml = MlService();
   bool _saving = false;
   String? _currentPrompt;
-  late AnimationController _fadeController;
   late AnimationController _floatController;
-  late AnimationController _breatheController;
-  late Animation<double> _fadeAnimation;
   late Animation<double> _floatAnimation;
-  late Animation<double> _breatheAnimation;
+  
+  // Cache journal entries to prevent rebuilds when typing
+  List<JournalEntry>? _cachedJournalEntries;
+  bool _isLoadingEntries = true;
   
   final _prompts = const [
     'What went well today and why?',
@@ -41,14 +39,6 @@ class _JournalPageState extends State<JournalPage>
   void initState() {
     super.initState();
     
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
-    
     _floatController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -57,22 +47,44 @@ class _JournalPageState extends State<JournalPage>
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
     
-    _breatheController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    )..repeat(reverse: true);
-    _breatheAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _breatheController, curve: Curves.easeInOut),
-    );
+    // Add listener to text controller to avoid rebuilds while typing
+    _ctrl.addListener(() {
+      // Only trigger state changes if needed, not on every character
+    });
     
-    _fadeController.forward();
+    _loadJournalEntries();
+  }
+
+  Future<void> _loadJournalEntries() async {
+    try {
+      final entries = await HiveService.getJournalEntries();
+      entries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (mounted) {
+        setState(() {
+          _cachedJournalEntries = entries;
+          _isLoadingEntries = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cachedJournalEntries = [];
+          _isLoadingEntries = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshJournalEntries() async {
+    setState(() {
+      _isLoadingEntries = true;
+    });
+    await _loadJournalEntries();
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
     _floatController.dispose();
-    _breatheController.dispose();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
@@ -112,6 +124,9 @@ class _JournalPageState extends State<JournalPage>
       _ctrl.clear();
       _currentPrompt = null;
       
+      // Refresh journal entries to show the new entry
+      await _refreshJournalEntries();
+      
       // Show success feedback
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -143,6 +158,9 @@ class _JournalPageState extends State<JournalPage>
       
       _ctrl.clear();
       _currentPrompt = null;
+      
+      // Refresh journal entries to show the new entry
+      await _refreshJournalEntries();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -187,15 +205,8 @@ class _JournalPageState extends State<JournalPage>
       ),
       body: Stack(
         children: [
-          // Animated background
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _BackgroundPainter(
-                animation: _floatAnimation,
-                isDark: isDark,
-              ),
-            ),
-          ),
+          // Animated background - separated to prevent rebuilds
+          const _AnimatedBackground(),
           // Content
           SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -206,20 +217,9 @@ class _JournalPageState extends State<JournalPage>
                 const SizedBox(height: 24),
                 _buildPromptsSection(theme, isDark),
                 const SizedBox(height: 32),
-                FutureBuilder<List<JournalEntry>>(
-                  future: HiveService.getJournalEntries(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    final journalEntries = snapshot.data ?? [];
-                    // Sort entries by date (newest first)
-                    journalEntries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-                    
-                    return _buildEntriesSection(theme, journalEntries, isDark);
-                  },
-                ),
+                _isLoadingEntries
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildEntriesSection(theme, _cachedJournalEntries ?? [], isDark),
                 const SizedBox(height: 20),
               ],
             ),
@@ -933,12 +933,67 @@ class _PremiumSentimentBadge extends StatelessWidget {
   }
 }
 
+// Separate animated background widget to prevent rebuilds while typing
+class _AnimatedBackground extends StatefulWidget {
+  const _AnimatedBackground();
+
+  @override
+  State<_AnimatedBackground> createState() => _AnimatedBackgroundState();
+}
+
+class _AnimatedBackgroundState extends State<_AnimatedBackground>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _backgroundController;
+  late Animation<double> _backgroundAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 20),
+      vsync: this,
+    );
+    _backgroundAnimation = Tween<double>(
+      begin: 0.0,
+      end: 100.0,
+    ).animate(CurvedAnimation(
+      parent: _backgroundController,
+      curve: Curves.linear,
+    ));
+    _backgroundController.repeat();
+  }
+
+  @override
+  void dispose() {
+    _backgroundController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _backgroundAnimation,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _BackgroundPainter(
+              animation: _backgroundAnimation,
+              isDark: isDark,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _BackgroundPainter extends CustomPainter {
   final Animation<double> animation;
   final bool isDark;
 
-  _BackgroundPainter({required this.animation, required this.isDark})
-      : super(repaint: animation);
+  _BackgroundPainter({required this.animation, required this.isDark});
 
   @override
   void paint(Canvas canvas, Size size) {
