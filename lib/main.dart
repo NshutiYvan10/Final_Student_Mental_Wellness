@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'core/app_router.dart';
 import 'theme/app_theme.dart';
@@ -20,6 +21,15 @@ Future<void> main() async {
 
   // Initialize Firebase (safe no-op if not configured yet)
   await FirebaseService.tryInitializeFirebase();
+
+  // If Firebase is initialized and user is already signed in, 
+  // initialize their user-specific boxes
+  if (FirebaseService.isInitialized) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      await HiveService.initializeUserBoxes(currentUser.uid);
+    }
+  }
 
   // Initialize ML (TFLite) and notifications
   await MlService().initialize();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:ui';
 import '../../services/hive_service.dart';
+import '../../models/mood_entry.dart';
 import '../../widgets/gradient_card.dart';
 
 class MoodLoggerPage extends StatefulWidget {
@@ -50,12 +51,14 @@ class _MoodLoggerPageState extends State<MoodLoggerPage>
   }
 
   Future<void> _save() async {
-    final box = Hive.box(HiveService.moodsBox);
-    await box.add({
-      'date': DateTime.now().toIso8601String(),
-      'mood': _selected,
-      'note': _noteCtrl.text,
-    });
+    final moodEntry = MoodEntry(
+      date: DateTime.now(),
+      mood: _selected,
+      note: _noteCtrl.text.trim(),
+    );
+    
+    await HiveService.saveMoodEntry(moodEntry);
+    
     if (!mounted) return;
     
     // Show success feedback

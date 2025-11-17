@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import '../../services/hive_service.dart';
 import '../../services/ml_service.dart';
+import '../../models/journal_entry.dart';
 import '../../widgets/gradient_card.dart';
 
 class JournalPage extends StatefulWidget {
@@ -99,14 +100,14 @@ class _JournalPageState extends State<JournalPage>
         onTimeout: () => 0.0, // Default neutral sentiment on timeout
       );
       
-      final id = const Uuid().v4();
-      final box = Hive.box(HiveService.journalBox);
-      await box.add({
-        'id': id,
-        'createdAt': DateTime.now().toIso8601String(),
-        'text': _ctrl.text,
-        'sentiment': sentiment,
-      });
+      final journalEntry = JournalEntry(
+        id: const Uuid().v4(),
+        createdAt: DateTime.now(),
+        text: _ctrl.text,
+        sentiment: sentiment,
+      );
+      
+      await HiveService.saveJournalEntry(journalEntry);
       
       _ctrl.clear();
       _currentPrompt = null;
@@ -131,14 +132,14 @@ class _JournalPageState extends State<JournalPage>
     } catch (e) {
       print('Error saving journal: $e');
       // Save without sentiment if analysis fails
-      final id = const Uuid().v4();
-      final box = Hive.box(HiveService.journalBox);
-      await box.add({
-        'id': id,
-        'createdAt': DateTime.now().toIso8601String(),
-        'text': _ctrl.text,
-        'sentiment': 0.0, // Neutral sentiment as fallback
-      });
+      final journalEntry = JournalEntry(
+        id: const Uuid().v4(),
+        createdAt: DateTime.now(),
+        text: _ctrl.text,
+        sentiment: 0.0, // Neutral sentiment as fallback
+      );
+      
+      await HiveService.saveJournalEntry(journalEntry);
       
       _ctrl.clear();
       _currentPrompt = null;
@@ -170,10 +171,6 @@ class _JournalPageState extends State<JournalPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final box = Hive.box(HiveService.journalBox);
-    final entries = box.values.toList().cast<Map>();
-    entries.sort((a, b) => (DateTime.parse(b['createdAt'] as String))
-        .compareTo(DateTime.parse(a['createdAt'] as String)));
 
     return Scaffold(
       appBar: AppBar(
@@ -209,7 +206,20 @@ class _JournalPageState extends State<JournalPage>
                 const SizedBox(height: 24),
                 _buildPromptsSection(theme, isDark),
                 const SizedBox(height: 32),
-                _buildEntriesSection(theme, entries, isDark),
+                FutureBuilder<List<JournalEntry>>(
+                  future: HiveService.getJournalEntries(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    final journalEntries = snapshot.data ?? [];
+                    // Sort entries by date (newest first)
+                    journalEntries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                    
+                    return _buildEntriesSection(theme, journalEntries, isDark);
+                  },
+                ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -603,7 +613,7 @@ class _JournalPageState extends State<JournalPage>
     );
   }
 
-  Widget _buildEntriesSection(ThemeData theme, List entries, bool isDark) {
+  Widget _buildEntriesSection(ThemeData theme, List<JournalEntry> entries, bool isDark) {
     if (entries.isEmpty) {
       return _buildEmptyState(theme, isDark);
     }
@@ -741,10 +751,10 @@ class _JournalPageState extends State<JournalPage>
     );
   }
 
-  Widget _buildPremiumJournalEntry(ThemeData theme, Map entry, bool isDark) {
-    final sentiment = (entry['sentiment'] as num).toDouble();
-    final date = DateTime.parse(entry['createdAt'] as String);
-    final text = entry['text'] as String;
+  Widget _buildPremiumJournalEntry(ThemeData theme, JournalEntry entry, bool isDark) {
+    final sentiment = entry.sentiment;
+    final date = entry.createdAt;
+    final text = entry.text;
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),

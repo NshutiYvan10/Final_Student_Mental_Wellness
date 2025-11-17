@@ -14,7 +14,16 @@ class AuthService {
     if (!FirebaseService.isInitialized) {
       return const Stream<fb.User?>.empty();
     }
-    return _auth.authStateChanges();
+    
+    return _auth.authStateChanges().asyncMap((user) async {
+      if (user != null) {
+        // User signed in - initialize their boxes
+        await HiveService.initializeUserBoxes(user.uid);
+      }
+      // Note: We don't close boxes here on sign out because 
+      // that's handled explicitly in the signOut() method
+      return user;
+    });
   }
 
   static Future<void> signInWithEmail(String email, String password) async {
@@ -24,6 +33,11 @@ class AuthService {
     
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // Initialize user-specific Hive boxes after successful sign-in
+      final user = _auth.currentUser;
+      if (user != null) {
+        await HiveService.initializeUserBoxes(user.uid);
+      }
     } catch (e) {
       rethrow;
     }
@@ -66,6 +80,9 @@ class AuthService {
             .doc(credential.user!.uid)
             .set(userProfile.toMap());
 
+        // Initialize user-specific Hive boxes for new user
+        await HiveService.initializeUserBoxes(credential.user!.uid);
+
         // Cache essentials locally
         await HiveService.setProfileName(displayName);
         await HiveService.setProfileSchool(school);
@@ -78,6 +95,13 @@ class AuthService {
 
   static Future<void> signOut() async {
     if (!FirebaseService.isInitialized) return;
+    
+    // Close user-specific boxes before signing out
+    final user = _auth.currentUser;
+    if (user != null) {
+      await HiveService.closeUserBoxes(user.uid);
+    }
+    
     await _auth.signOut();
   }
 

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../services/hive_service.dart';
+import '../../models/mood_entry.dart';
 import '../../widgets/gradient_card.dart';
 
 class MoodListPage extends StatefulWidget {
@@ -50,11 +51,7 @@ class _MoodListPageState extends State<MoodListPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final box = Hive.box(HiveService.moodsBox);
-    final entries = box.values.toList().cast<Map>();
-    entries.sort((a, b) => (DateTime.parse(b['date'] as String))
-        .compareTo(DateTime.parse(a['date'] as String)));
-
+    
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -96,32 +93,45 @@ class _MoodListPageState extends State<MoodListPage>
           opacity: _fadeAnimation,
           child: ScaleTransition(
             scale: _scaleAnimation,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _buildPremiumHeader(theme, isDark),
-                ),
-                if (entries.isEmpty)
-                  SliverFillRemaining(
-                    child: _buildEmptyState(theme, isDark),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final e = entries[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: _buildMoodEntry(theme, isDark, e, index),
-                          );
-                        },
-                        childCount: entries.length,
-                      ),
+            child: FutureBuilder<List<MoodEntry>>(
+              future: HiveService.getMoodEntries(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final moodEntries = snapshot.data ?? [];
+                // Sort entries by date (newest first)
+                moodEntries.sort((a, b) => b.date.compareTo(a.date));
+                
+                return CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildPremiumHeader(theme, isDark),
                     ),
-                  ),
-              ],
+                    if (moodEntries.isEmpty)
+                      SliverFillRemaining(
+                        child: _buildEmptyState(theme, isDark),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final entry = moodEntries[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: _buildMoodEntry(theme, isDark, entry, index),
+                              );
+                            },
+                            childCount: moodEntries.length,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -225,10 +235,10 @@ class _MoodListPageState extends State<MoodListPage>
     );
   }
 
-  Widget _buildMoodEntry(ThemeData theme, bool isDark, Map entry, int index) {
-    final mood = entry['mood'] as int;
-    final note = (entry['note'] as String?) ?? '';
-    final date = DateTime.parse(entry['date'] as String);
+  Widget _buildMoodEntry(ThemeData theme, bool isDark, MoodEntry entry, int index) {
+    final mood = entry.mood;
+    final note = entry.note;
+    final date = entry.date;
     
     final moodColors = [
       const Color(0xFFEF4444), // Red for very low
