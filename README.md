@@ -637,17 +637,17 @@ This project is not open-source and is not available for public use, modificatio
 ## 👥 Team & Acknowledgments
 
 ### Development Team
-- **Lead Developer & UI/UX Designer**: Single developer responsible for all aspects of the application - from concept and design to full-stack implementation and AI integration
+- **Lead Developer & UI/UX Designer**: Nshuti Ngabo Yvan: Single developer responsible for all aspects of the application - from concept and design to full-stack implementation and AI integration
 
 ### Acknowledgments
-Special thanks to my Mobile Programming instructor, Regis Safi, who introduced me to Flutter and showed me that everything is possible, and that everything eventually makes sense if you give it time.
+Special thanks to my Mobile Programming instructor, Regis Safi, for introducing me to Flutter and demonstrating that with patience and persistence, everything is possible and eventually makes sense.
 
 ---
 
 ## 📞 Support & Contact
 
 ### Get Help
-- 📧 **Email**: [Your Email Address]
+- 📧 **Email**: yvannshuti10@gmail.com
 - 📱 **In-App Support**: Available through the help section for technical questions
 
 ### Crisis Resources
