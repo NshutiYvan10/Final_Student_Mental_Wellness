@@ -532,10 +532,41 @@ class _UserSearchPageState extends ConsumerState<UserSearchPage> {
   final _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   List<UserProfile> _searchResults = [];
+  List<UserProfile> _allUsers = []; // All users loaded initially
   bool _isSearching = false;
+  bool _isLoadingUsers = true; // Loading state for initial users
   String _query = "";
   final Debouncer _debouncer = Debouncer(milliseconds: 400);
-  // *** FIX: Removed _addingMemberIds Set ***
+  UserProfile? _currentUser; // Current user reference
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+    _loadAllUsers();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await AuthService.getCurrentUserProfile();
+    if (mounted) setState(() => _currentUser = user);
+  }
+
+  Future<void> _loadAllUsers() async {
+    try {
+      setState(() => _isLoadingUsers = true);
+      final users = await MessagingService.searchUsers(''); // Empty search returns all
+      if (mounted) {
+        final currentUser = await AuthService.getCurrentUserProfile();
+        setState(() {
+          _allUsers = users.where((u) => u.uid != currentUser?.uid).toList();
+          _isLoadingUsers = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading users: $e");
+      if (mounted) setState(() => _isLoadingUsers = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -607,107 +638,443 @@ class _UserSearchPageState extends ConsumerState<UserSearchPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final msgTheme = context.messagingTheme;
-    final appBarForegroundColor = theme.brightness == Brightness.dark ? Colors.white : theme.colorScheme.onSurface;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        iconTheme: IconThemeData(color: appBarForegroundColor),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: ClipRRect(
+      backgroundColor: msgTheme.chatRoomBackground,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(70),
+        child: ClipRRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? msgTheme.inputBackgroundColor.withOpacity(0.75)
-                      : AppTheme.softBg.withOpacity(0.85),
-                  border: Border(bottom: BorderSide(
-                      color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08),
-                      width: 1))
-              ),
-            ),
-          ),
-        ),
-        title: TextField(
-          controller: _searchController,
-          focusNode: _searchFocus,
-          autofocus: true,
-          decoration: InputDecoration(
-            // *** FIX: Simplified hint text ***
-            hintText: 'Search by name...',
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: appBarForegroundColor.withOpacity(0.6)),
-          ),
-          style: TextStyle(color: appBarForegroundColor),
-          onChanged: _searchUsers,
-          textInputAction: TextInputAction.search,
-        ),
-        actions: [
-          if (_query.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.clear, color: appBarForegroundColor.withOpacity(0.7)),
-              onPressed: () {
-                _searchController.clear();
-                _searchFocus.unfocus();
-                setState(() { _searchResults = []; _isSearching = false; _query = ''; });
-              },
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: GradientBackground(
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Flexible(
-                child: _isSearching
-                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                    : _searchResults.isEmpty && _query.isNotEmpty
-                    ? const Center(child: EmptyStateWidget( // *** FIX: Removed style parameters ***
-                  icon: Icons.search_off_rounded,
-                  title: 'No Users Found',
-                  message: 'Try searching with a different name or check spelling.',
-                ))
-                    : _searchResults.isEmpty && _query.isEmpty
-                    ? const Center(child: EmptyStateWidget( // *** FIX: Removed style parameters ***
-                  icon: Icons.search_rounded,
-                  title: 'Search for Users', // *** FIX: Simplified title ***
-                  message: 'Find students and mentors to connect with.', // *** FIX: Simplified message ***
-                ))
-                    : AnimationLimiter(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(left: 12, right: 12, top: 16, bottom: 16),
-                    itemCount: _searchResults.length,
-                    itemBuilder: (context, index) {
-                      final user = _searchResults[index];
-                      // *** FIX: Reverted button logic back to just "Chat" ***
-                      return StaggeredListItem(
-                        index: index,
-                        child: UserProfileTile(
-                          user: user,
-                          trailing: ElevatedButton.icon(
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                            label: const Text('Chat'),
-                            onPressed: () => _startChat(user), // Call _startChat directly
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(80, 36),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                          onTap: () => _startChat(user), // Also start chat on tap
-                        ),
-                      );
-                    },
+                color: isDark
+                    ? msgTheme.inputBackgroundColor.withOpacity(0.85)
+                    : Colors.white.withOpacity(0.92),
+                border: Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.onSurface.withOpacity(0.06),
+                    width: 1,
                   ),
                 ),
               ),
-            ],
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                        onPressed: () => Navigator.pop(context),
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? theme.colorScheme.surface.withOpacity(0.4)
+                                : theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: theme.colorScheme.onSurface.withOpacity(0.08),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 16),
+                              Icon(
+                                Icons.search_rounded,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  focusNode: _searchFocus,
+                                  autofocus: true,
+                                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                                  decoration: InputDecoration(
+                                    hintText: 'Search by name...',
+                                    hintStyle: TextStyle(
+                                      color: theme.colorScheme.onSurface.withOpacity(0.4),
+                                      fontSize: 15,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                                    filled: false,
+                                  ),
+                                  onChanged: _searchUsers,
+                                  textInputAction: TextInputAction.search,
+                                ),
+                              ),
+                              if (_query.isNotEmpty)
+                                IconButton(
+                                  icon: Icon(Icons.clear_rounded, size: 20),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _searchFocus.unfocus();
+                                    setState(() {
+                                      _searchResults = [];
+                                      _isSearching = false;
+                                      _query = '';
+                                    });
+                                  },
+                                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                ),
+                              const SizedBox(width: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: _isLoadingUsers
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                ),
+              )
+            : _isSearching
+                ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+                : _buildUserList(theme),
+      ),
+    );
+  }
+
+  Widget _buildUserList(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Get the list to display (search results or all users)
+    final usersToDisplay = _query.isNotEmpty ? _searchResults : _allUsers;
+
+    if (usersToDisplay.isEmpty && _query.isNotEmpty) {
+      return const Center(
+        child: EmptyStateWidget(
+          icon: Icons.search_off_rounded,
+          title: 'No Users Found',
+          message: 'Try searching with a different name or check spelling.',
+        ),
+      );
+    }
+
+    if (usersToDisplay.isEmpty && _query.isEmpty) {
+      return const Center(
+        child: EmptyStateWidget(
+          icon: Icons.people_outline_rounded,
+          title: 'No Users Available',
+          message: 'There are no users to display at the moment.',
+        ),
+      );
+    }
+
+    // Section users by role
+    final students = usersToDisplay.where((u) => u.role == UserRole.student).toList();
+    final mentors = usersToDisplay.where((u) => u.role == UserRole.mentor).toList();
+
+    return ListView(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
+      children: [
+        // Students Section
+        if (students.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0, top: 0, bottom: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryColor.withOpacity(0.2),
+                        AppTheme.secondaryColor.withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.school_rounded,
+                    size: 16,
+                    color: isDark ? Colors.white : Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Students',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${students.length}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimationLimiter(
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: students.length,
+              itemBuilder: (context, index) {
+                final user = students[index];
+                return StaggeredListItem(
+                  index: index,
+                  child: _UserSearchTile(
+                    user: user,
+                    onChatTap: () => _startChat(user),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+
+        // Mentors Section
+        if (mentors.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0, top: 16, bottom: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.withOpacity(0.2),
+                        Colors.deepOrange.withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.volunteer_activism_rounded,
+                    size: 16,
+                    color: isDark ? Colors.orange.shade300 : Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Mentors',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${mentors.length}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimationLimiter(
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: mentors.length,
+              itemBuilder: (context, index) {
+                final user = mentors[index];
+                return StaggeredListItem(
+                  index: index,
+                  child: _UserSearchTile(
+                    user: user,
+                    onChatTap: () => _startChat(user),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// Premium user tile for search results
+class _UserSearchTile extends StatelessWidget {
+  final UserProfile user;
+  final VoidCallback onChatTap;
+
+  const _UserSearchTile({
+    required this.user,
+    required this.onChatTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onChatTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? theme.colorScheme.surface.withOpacity(0.5)
+                  : theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: theme.colorScheme.onSurface.withOpacity(0.08),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Avatar with gradient ring
+                Container(
+                  width: 50,
+                  height: 50,
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary.withOpacity(0.25),
+                        theme.colorScheme.secondary.withOpacity(0.25),
+                      ],
+                    ),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? theme.colorScheme.surface : Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (user.school.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          user.school,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Chat button
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onChatTap,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              'Chat',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

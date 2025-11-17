@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:ui';
 import '../../services/hive_service.dart';
 import '../../widgets/gradient_card.dart';
 
@@ -16,6 +17,8 @@ class _MoodLoggerPageState extends State<MoodLoggerPage>
   final _noteCtrl = TextEditingController();
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
@@ -27,12 +30,21 @@ class _MoodLoggerPageState extends State<MoodLoggerPage>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutCubic),
+    );
     _fadeController.forward();
+    _scaleController.forward();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
+    _scaleController.dispose();
     _noteCtrl.dispose();
     super.dispose();
   }
@@ -68,156 +80,346 @@ class _MoodLoggerPageState extends State<MoodLoggerPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            backgroundColor: theme.scaffoldBackgroundColor,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Log Your Mood',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                ),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? Colors.white.withOpacity(0.1)
+                  : Colors.black.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.arrow_back_rounded,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPremiumHeader(theme, isDark),
+                  const SizedBox(height: 32),
+                  _buildMoodSelector(theme, isDark),
+                  const SizedBox(height: 24),
+                  _buildNoteSection(theme, isDark),
+                  const SizedBox(height: 32),
+                  _buildActionButtons(theme, isDark),
+                  const SizedBox(height: 16),
+                ],
               ),
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.all(24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: _buildMoodSelector(theme),
-                ),
-                const SizedBox(height: 32),
-                _buildNoteSection(theme),
-                const SizedBox(height: 32),
-                _buildActionButtons(theme),
-              ]),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildMoodSelector(ThemeData theme) {
-    return GradientCard(
-      colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Text(
-            'How are you feeling right now?',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          _EmojiWheel(
-            selected: _selected,
-            onSelect: (v) => setState(() => _selected = v),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _getMoodDescription(_selected),
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoteSection(ThemeData theme) {
+  Widget _buildPremiumHeader(ThemeData theme, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Add a Note (Optional)',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: theme.colorScheme.onSurface,
+        ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(
+            colors: [
+              theme.colorScheme.primary,
+              theme.colorScheme.secondary,
+            ],
+          ).createShader(bounds),
+          child: Text(
+            'How Are You Feeling?',
+            style: theme.textTheme.headlineLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _noteCtrl,
-            decoration: InputDecoration(
-              hintText: 'Share what\'s on your mind...',
-              hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(20),
-            ),
-            style: theme.textTheme.bodyLarge,
-            minLines: 3,
-            maxLines: 6,
+        const SizedBox(height: 8),
+        Text(
+          'Track your emotional well-being',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            fontWeight: FontWeight.w400,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme) {
-    return Row(
+  Widget _buildMoodSelector(ThemeData theme, bool isDark) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: isDark ? 20 : 0, sigmaY: isDark ? 20 : 0),
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.05),
+                    ]
+                  : [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : Colors.white.withOpacity(0.3),
+              width: isDark ? 1.5 : 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark 
+                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    : theme.colorScheme.primary.withOpacity(0.3),
+                blurRadius: isDark ? 20 : 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.psychology_alt_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Select Your Mood',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              _EmojiWheel(
+                selected: _selected,
+                onSelect: (v) => setState(() => _selected = v),
+                isDark: isDark,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  _getMoodDescription(_selected),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.white.withOpacity(0.95),
+                    fontWeight: FontWeight.w500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoteSection(ThemeData theme, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withOpacity(0.2),
+                    theme.colorScheme.secondary.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.edit_note_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Add a Note (Optional)',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: isDark ? 10 : 0, sigmaY: isDark ? 10 : 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.05)
+                    : theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : theme.colorScheme.outline.withOpacity(0.15),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.1 : 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _noteCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Share what\'s on your mind...',
+                  hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(20),
+                ),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  height: 1.5,
+                ),
+                minLines: 4,
+                maxLines: 8,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(ThemeData theme, bool isDark) {
+    return Column(
+      children: [
+        // Save Button
+        Container(
+          width: double.infinity,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary,
+                theme.colorScheme.secondary,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
           child: ElevatedButton.icon(
             onPressed: _save,
-            icon: const Icon(Icons.check_rounded, size: 24),
-            label: const Text('Save Mood'),
+            icon: const Icon(Icons.check_circle_rounded, size: 22),
+            label: const Text(
+              'Save Mood',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 16),
-        Expanded(
+        const SizedBox(height: 12),
+        // History Button
+        Container(
+          width: double.infinity,
+          height: 56,
           child: OutlinedButton.icon(
             onPressed: () => Navigator.pushNamed(context, '/mood/list'),
-            icon: const Icon(Icons.history_rounded, size: 24),
-            label: const Text('History'),
+            icon: Icon(
+              Icons.history_rounded,
+              size: 22,
+              color: theme.colorScheme.primary,
+            ),
+            label: Text(
+              'View History',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: theme.colorScheme.primary,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              side: BorderSide(color: theme.colorScheme.primary),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(
+                color: theme.colorScheme.primary.withOpacity(0.3),
+                width: 2,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
+              backgroundColor: isDark
+                  ? theme.colorScheme.primary.withOpacity(0.05)
+                  : theme.colorScheme.primary.withOpacity(0.05),
             ),
           ),
         ),
@@ -240,7 +442,13 @@ class _MoodLoggerPageState extends State<MoodLoggerPage>
 class _EmojiWheel extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
-  const _EmojiWheel({required this.selected, required this.onSelect});
+  final bool isDark;
+  
+  const _EmojiWheel({
+    required this.selected,
+    required this.onSelect,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -262,28 +470,28 @@ class _EmojiWheel extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: InkWell(
                 onTap: () => onSelect(i),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   decoration: BoxDecoration(
                     color: i == selected 
-                        ? colors[i - 1].withValues(alpha: 0.2)
-                        : Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
+                        ? colors[i - 1].withOpacity(0.25)
+                        : Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: i == selected 
                           ? colors[i - 1]
-                          : Colors.white.withValues(alpha: 0.3),
-                      width: i == selected ? 2 : 1,
+                          : Colors.white.withOpacity(0.2),
+                      width: i == selected ? 2.5 : 1.5,
                     ),
                     boxShadow: [
                       if (i == selected)
                         BoxShadow(
-                          color: colors[i - 1].withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                          color: colors[i - 1].withOpacity(0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                     ],
                   ),
@@ -292,16 +500,25 @@ class _EmojiWheel extends StatelessWidget {
                       Text(
                         emojis[i], 
                         style: TextStyle(
-                          fontSize: i == selected ? 36 : 32,
+                          fontSize: i == selected ? 40 : 34,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Container(
-                        width: 8,
-                        height: 8,
+                        width: i == selected ? 10 : 6,
+                        height: i == selected ? 10 : 6,
                         decoration: BoxDecoration(
-                          color: i == selected ? colors[i - 1] : Colors.transparent,
+                          color: i == selected ? colors[i - 1] : Colors.white.withOpacity(0.3),
                           shape: BoxShape.circle,
+                          boxShadow: i == selected
+                              ? [
+                                  BoxShadow(
+                                    color: colors[i - 1].withOpacity(0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : [],
                         ),
                       ),
                     ],

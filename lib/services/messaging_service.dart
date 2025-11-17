@@ -60,12 +60,25 @@ class MessagingService {
       return const Stream.empty();
     }
 
+    // Check if user is authenticated
+    final user = __auth.currentUser;
+    if (user == null) {
+      return Stream.error(Exception('User must be authenticated to view public groups'));
+    }
+
     return __db
           .collection('chat_rooms')
           .where('type', isEqualTo: ChatType.group.name)
         .where('isPrivate', isEqualTo: false)
         .limit(100)
         .snapshots()
+        .handleError((error) {
+          // Handle Firestore permission errors more gracefully
+          if (error is FirebaseException && error.code == 'permission-denied') {
+            throw Exception('Permission denied: Please make sure Firestore security rules allow reading public groups');
+          }
+          throw error;
+        })
         .map((snapshot) {
           final groups = snapshot.docs
               .map((doc) => ChatRoom.fromMap({...doc.data(), 'id': doc.id}))
@@ -493,7 +506,7 @@ class MessagingService {
 
     final user = _auth.currentUser;
     if (user == null) {
-      return const Stream.empty();
+      return Stream.error(Exception('User must be authenticated to view chat requests'));
     }
 
       return __db
@@ -501,6 +514,13 @@ class MessagingService {
         .where('targetUserId', isEqualTo: user.uid)
         .where('status', isEqualTo: ChatRequestStatus.pending.name)
         .snapshots()
+        .handleError((error) {
+          // Handle Firestore permission errors more gracefully
+          if (error is FirebaseException && error.code == 'permission-denied') {
+            throw Exception('Permission denied: Please check Firestore security rules for chat_requests collection');
+          }
+          throw error;
+        })
         .map((snapshot) {
           final requests = snapshot.docs
               .map((doc) => ChatRequest.fromMap({...doc.data(), 'id': doc.id}))

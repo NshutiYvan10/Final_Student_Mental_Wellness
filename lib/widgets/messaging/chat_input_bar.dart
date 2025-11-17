@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import '../../theme/app_theme.dart';
 import '../../theme/messaging_theme.dart';
-import '../../widgets/gradient_card.dart'; // Using GradientCard style
+import 'dart:ui';
 
 class ChatInputBar extends StatefulWidget {
   final TextEditingController controller;
@@ -55,141 +55,179 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final msgTheme = context.messagingTheme;
     final bottomInsets = MediaQuery.of(context).viewInsets.bottom;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    final double bottomPadding = bottomInsets > 0 ? bottomInsets : (safeAreaBottom > 0 ? safeAreaBottom : 12.0); // More default padding
+    final double bottomPadding = bottomInsets > 0 ? bottomInsets : (safeAreaBottom > 0 ? safeAreaBottom : 12.0);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 12,
-        right: 12,
-        top: 8,
-        bottom: bottomPadding,
-      ),
+      padding: EdgeInsets.only(left: 12, right: 12, top: 12, bottom: bottomPadding + 4),
       decoration: BoxDecoration(
         color: msgTheme.inputBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        border: Border(top: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.06))),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Attachment Button (optional: can be moved inside text field)
-          // IconButton(
-          //   icon: Icon(Icons.add_circle_outline_rounded, color: msgTheme.attachmentButtonColor),
-          //   onPressed: widget.onAttachmentPressed,
-          //   tooltip: 'Attach file or image',
-          //   padding: const EdgeInsets.all(12),
-          // ),
+          // Attach button (moved to left)
+          Container(
+            width: 40,
+            height: 40,
+            margin: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: widget.onAttachmentPressed,
+                child: Icon(
+                  Icons.attach_file_rounded,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
 
-          // --- Sleek Text Input ---
+          // Text field container
           Expanded(
             child: Container(
+              constraints: const BoxConstraints(minHeight: 44, maxHeight: 120),
               decoration: BoxDecoration(
-                // Using the GradientCard's visual style
-                  gradient: LinearGradient(
-                    colors: [
-                      (theme.brightness == Brightness.dark ? AppTheme.darkSurface : AppTheme.softBg).withOpacity(0.5),
-                      (theme.brightness == Brightness.dark ? AppTheme.darkSurface : AppTheme.softBg).withOpacity(0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: msgTheme.dividerColor, width: 1.0)
+                color: isDark
+                    ? theme.colorScheme.surface.withOpacity(0.4)
+                    : theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: theme.colorScheme.onSurface.withOpacity(0.08),
+                  width: 1,
+                ),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Attachment Button (Inside)
-                  IconButton(
-                    icon: Icon(Icons.add_circle_outline_rounded, color: msgTheme.attachmentButtonColor),
-                    onPressed: widget.onAttachmentPressed,
-                    tooltip: 'Attach file or image',
-                    padding: const EdgeInsets.all(10),
-                  ),
-                  // Text Field
+                  const SizedBox(width: 16),
+                  
+                  // Text field
                   Expanded(
                     child: TextField(
                       focusNode: widget.focusNode,
                       controller: widget.controller,
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(color: msgTheme.inputTextColor),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontSize: 15,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Message...',
                         hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                          color: msgTheme.inputHintColor,
+                          color: theme.colorScheme.onSurface.withOpacity(0.4),
+                          fontSize: 15,
                         ),
-                        border: InputBorder.none, // No border inside
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12, // Adjusted padding
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 11, horizontal: 0),
                       ),
                       maxLines: null,
                       textCapitalization: TextCapitalization.sentences,
                       keyboardType: TextInputType.multiline,
                       onChanged: widget.onTextChanged,
+                      cursorColor: theme.colorScheme.primary,
                     ),
                   ),
-                  // TODO: Add Emoji Button
-                  IconButton(
-                    icon: Icon(Icons.emoji_emotions_outlined, color: msgTheme.attachmentButtonColor),
-                    onPressed: () {
-                      // TODO: Implement emoji picker
-                    },
-                    padding: const EdgeInsets.all(10),
+                  
+                  // Emoji button inside field (moved to right)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        // TODO: hook up emoji picker
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.emoji_emotions_outlined,
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          size: 22,
+                        ),
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 4),
                 ],
               ),
             ),
           ),
+
           const SizedBox(width: 8),
 
-          // --- Animated Send/Attach Button ---
+          // Send / Mic button
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, animation) {
-              return ScaleTransition(
-                scale: animation,
-                child: FadeTransition(
-                  opacity: animation,
-                  child: child,
-                ),
-              );
-            },
+            duration: const Duration(milliseconds: 180),
+            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
             child: _canSend
-                ? FloatingActionButton(
-              key: const ValueKey('send_button'),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                widget.onSendPressed();
-              },
-              backgroundColor: msgTheme.sendButtonColor,
-              foregroundColor: msgTheme.sendButtonIconColor,
-              elevation: 1,
-              mini: true,
-              tooltip: 'Send',
-              child: const Icon(Icons.send_rounded, size: 20),
-            )
-                : FloatingActionButton( // Placeholder for Mic or other action
-              key: const ValueKey('mic_button'),
-              onPressed: () {
-                // TODO: Implement Voice Message
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Voice messages TBD'))
-                );
-              },
-              backgroundColor: msgTheme.inputBackgroundColor, // Use background color
-              foregroundColor: msgTheme.attachmentButtonColor,
-              elevation: 0.5,
-              mini: true,
-              tooltip: 'Record voice message',
-              child: const Icon(Icons.mic_none_rounded, size: 20),
-            ),
+                ? Material(
+                    key: const ValueKey('send_button'),
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        widget.onSendPressed();
+                      },
+                      borderRadius: BorderRadius.circular(22),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                        ),
+                        child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  )
+                : Material(
+                    key: const ValueKey('mic_button'),
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Voice messages coming soon')),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(22),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Icon(
+                          Icons.mic_none_rounded,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),

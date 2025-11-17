@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:intl/intl.dart';
@@ -29,39 +30,13 @@ class MessageBubble extends StatelessWidget {
     final zeroRadius = Radius.zero;
 
     // --- Premium Bubble Styling ---
-    final decoration = BoxDecoration(
-      // Gradient for "my" messages, solid/subtle gradient for "other"
-      gradient: isMe
-          ? const LinearGradient(
-        colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      )
-          : LinearGradient(
-        colors: [
-          msgTheme.otherMessageBubbleColor,
-          msgTheme.otherMessageBubbleColor.withOpacity(0.95),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.only(
-        topLeft: radius,
-        topRight: radius,
-        bottomLeft: isMe ? radius : (showTail ? zeroRadius : radius),
-        bottomRight: isMe ? (showTail ? zeroRadius : radius) : radius,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(isMe ? 0.1 : 0.06),
-          blurRadius: 5,
-          offset: const Offset(0, 2),
-        ),
-      ],
+    final textColor = isMe ? msgTheme.myMessageTextColor : msgTheme.otherMessageTextColor;
+    final borderRadius = BorderRadius.only(
+      topLeft: radius,
+      topRight: radius,
+      bottomLeft: isMe ? radius : (showTail ? zeroRadius : radius),
+      bottomRight: isMe ? (showTail ? zeroRadius : radius) : radius,
     );
-
-    final textColor =
-    isMe ? msgTheme.myMessageTextColor : msgTheme.otherMessageTextColor;
 
     Widget messageContent;
 
@@ -109,85 +84,79 @@ class MessageBubble extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(
-        bottom: showTail ? 10 : 4, // More spacing for new sender
-        left: isMe ? 40 : 0,
-        right: isMe ? 0 : 40,
+        bottom: showTail ? 12 : 6, // Slightly larger spacing for new sender
+        left: isMe ? 48 : 4,
+        right: isMe ? 4 : 48,
       ),
       child: Column(
-        crossAxisAlignment:
-        isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           // Display sender name for group chats (only for "other" users)
           if (!isMe && showTail && chatRoom.type == ChatType.group)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4.0, left: 12.0),
+              padding: const EdgeInsets.only(bottom: 6.0, left: 8.0),
               child: Text(
                 message.senderName.isNotEmpty ? message.senderName : 'User',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface.withOpacity(0.64),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
               ),
             ),
 
-          // --- Interactive Bubble Container ---
           GestureDetector(
             onLongPress: () {
               HapticFeedback.lightImpact(); // Haptic feedback on long press
               onLongPress();
             },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: decoration,
-              child: Column(
-                crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  messageContent,
-                  const SizedBox(height: 6),
-                  // --- Timestamp & Read Receipt ---
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (message.isEdited)
-                        Text(
-                          'edited · ',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: textColor.withOpacity(0.7),
-                            fontStyle: FontStyle.italic,
-                            fontSize: 11,
-                          ),
-                        ),
-                      Text(
-                        _formatTimestamp(message.createdAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: textColor.withOpacity(0.7),
-                          fontSize: 11,
-                        ),
-                      ),
-                      // Read Receipt Logic
-                      if (isMe) ...[
-                        const SizedBox(width: 4),
-                        // TODO: Implement real read receipt logic
-                        // (e.g., check if message.readBy contains all other members)
-                        Icon(
-                          Icons.done_all_rounded, // Double tick
-                          size: 14,
-                          // Use a brighter color (e.g., blue) when read by all
-                          color: true // (message.isReadByAll)
-                              ? AppTheme.accentColor
-                              : textColor.withOpacity(0.7),
-                        ),
-                      ]
-                    ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: isMe
+                      ? const LinearGradient(colors: [AppTheme.primaryColor, AppTheme.secondaryColor], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                      : null,
+                  color: isMe ? null : theme.colorScheme.surface.withOpacity(0.88),
+                  borderRadius: borderRadius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isMe ? 0.12 : 0.06),
+                      blurRadius: isMe ? 8 : 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: isMe 
+                        ? Colors.transparent 
+                        : theme.colorScheme.onSurface.withOpacity(0.08),
+                    width: 1,
                   ),
-                ],
+                ),
+                child: Column(
+                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    messageContent,
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (message.isEdited)
+                          Text('edited · ', style: theme.textTheme.bodySmall?.copyWith(color: textColor.withOpacity(0.72), fontStyle: FontStyle.italic, fontSize: 11)),
+                        Text(_formatTimestamp(message.createdAt), style: theme.textTheme.bodySmall?.copyWith(color: textColor.withOpacity(0.72), fontSize: 11)),
+                        if (isMe) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.done_all_rounded, size: 14, color: textColor.withOpacity(0.72)),
+                        ]
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          // TODO: Implement Reactions display
-          // if (message.reactions.isNotEmpty)
-          //   _buildReactions(context, message.reactions),
+          // placeholder for reactions or thread preview
         ],
       ),
     );

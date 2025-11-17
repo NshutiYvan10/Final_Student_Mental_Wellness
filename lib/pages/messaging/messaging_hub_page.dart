@@ -1417,7 +1417,7 @@
 
 
 
-import 'dart:ui'; // For blur
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
@@ -1432,7 +1432,7 @@ import '../../widgets/animations/staggered_list_item.dart';
 import '../../widgets/messaging/chat_list_item.dart';
 import '../../widgets/messaging/user_profile_tile.dart';
 import '../../widgets/messaging/request_tile.dart';
-import '../../widgets/messaging/empty_state_widget.dart'; // Import EmptyStateWidget
+import '../../widgets/messaging/empty_state_widget.dart';
 import 'create_group_page.dart';
 import 'user_search_page.dart';
 import 'public_groups_page.dart';
@@ -1480,85 +1480,237 @@ class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final msgTheme = context.messagingTheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    final appBarForegroundColor = theme.brightness == Brightness.dark
-        ? Colors.white
-        : theme.colorScheme.onSurface;
-
+    final appBarForegroundColor = isDark ? Colors.white : theme.colorScheme.onSurface;
     final double topPadding = MediaQuery.of(context).padding.top;
     final double appBarHeight = kToolbarHeight;
-    final double tabBarHeight = 64.0;
-    final double totalAppBarHeight = topPadding + appBarHeight + tabBarHeight;
-
+    final double tabBarHeight = 80.0; // Increased for premium look
+    final double extraSpacing = 12.0; // Extra spacing we added (8px header + 4px before tab bar)
+    final double totalAppBarHeight = topPadding + appBarHeight + tabBarHeight + extraSpacing;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        iconTheme: IconThemeData(color: appBarForegroundColor),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: appBarForegroundColor,
-        title: Text(
-          'Messages',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: appBarForegroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 130), // Increased padding to fully clear nav bar
+        child: AnimatedScale(
+          scale: _tabController.index == 0 ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutBack,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.secondary,
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: _navigateToSearch,
+              icon: const Icon(Icons.add_rounded, size: 24),
+              label: const Text(
+                'New Chat',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              splashColor: Colors.white.withOpacity(0.2),
+            ),
           ),
         ),
-        actions: [
-          if (_currentUser?.role == UserRole.mentor)
-            IconButton(
-              onPressed: _navigateToCreateGroup,
-              icon: Icon(Icons.group_add_rounded, color: appBarForegroundColor),
-              tooltip: 'Create Group',
-            ),
-          IconButton(
-            onPressed: _navigateToSearch,
-            icon: Icon(Icons.search_rounded, color: appBarForegroundColor),
-            tooltip: 'Search Users',
-          ),
-          const SizedBox(width: 8),
-        ],
-        flexibleSpace: ClipRRect(
+      ),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(appBarHeight + tabBarHeight + extraSpacing),
+        child: ClipRRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? msgTheme.inputBackgroundColor.withOpacity(0.75)
-                    : AppTheme.softBg.withOpacity(0.85),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [
+                          msgTheme.inputBackgroundColor.withOpacity(0.85),
+                          msgTheme.inputBackgroundColor.withOpacity(0.75),
+                        ]
+                      : [
+                          AppTheme.softBg.withOpacity(0.95),
+                          AppTheme.softBg.withOpacity(0.85),
+                        ],
+                ),
                 border: Border(
                   bottom: BorderSide(
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.black.withOpacity(0.08),
-                      width: 1),
+                    color: isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : Colors.black.withOpacity(0.05),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    // Premium Header with better spacing
+                    Container(
+                      height: appBarHeight + 8, // Fixed: Added extra height
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          // Stunning icon with animated gradient
+                          Hero(
+                            tag: 'messaging_hub_icon',
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.secondary,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: theme.colorScheme.primary.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.forum_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ShaderMask(
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: [
+                                      theme.colorScheme.primary,
+                                      theme.colorScheme.secondary,
+                                    ],
+                                  ).createShader(bounds),
+                                  child: Text(
+                                    'Messages',
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: -1.0,
+                                      height: 1.2,
+                                      fontSize: 26, // Fixed: Slightly smaller to prevent overlap
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10), // Fixed: More spacing to prevent any overlap
+                                Text(
+                                  'Stay connected with everyone',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: appBarForegroundColor.withOpacity(0.6),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8), // Fixed: Added spacing before buttons
+                          // Premium action buttons
+                          if (_currentUser?.role == UserRole.mentor)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _PremiumActionButton(
+                                icon: Icons.group_add_rounded,
+                                onPressed: _navigateToCreateGroup,
+                                tooltip: 'Create Group',
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.secondary.withOpacity(0.2),
+                                    theme.colorScheme.secondary.withOpacity(0.1),
+                                  ],
+                                ),
+                                iconColor: theme.colorScheme.secondary,
+                              ),
+                            ),
+                          _PremiumActionButton(
+                            icon: Icons.search_rounded,
+                            onPressed: _navigateToSearch,
+                            tooltip: 'Search',
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary.withOpacity(0.2),
+                                theme.colorScheme.primary.withOpacity(0.1),
+                              ],
+                            ),
+                            iconColor: theme.colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4), // Fixed: Added spacing before tab bar
+                    // Stunning Tab Bar
+                    _PremiumTabBar(
+                      controller: _tabController,
+                      tabs: const [
+                        _PremiumTab(
+                          icon: Icons.forum_rounded,
+                          label: 'Chats',
+                        ),
+                        _PremiumTab(
+                          icon: Icons.volunteer_activism_rounded,
+                          label: 'Mentors',
+                        ),
+                        _PremiumTab(
+                          icon: Icons.mark_chat_unread_rounded,
+                          label: 'Requests',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ),
-        bottom: StyledTabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Chats'),
-            Tab(text: 'Mentors'),
-            Tab(text: 'Requests'),
-          ],
-        ),
       ),
-      body: GradientBackground(
-        child: Padding(
-          padding: EdgeInsets.only(top: totalAppBarHeight),
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _ChatsTab(key: _chatsKey),
-              _MentorsTab(key: _mentorsKey),
-              _RequestsTab(key: _requestsKey),
-            ],
-          ),
+      body: Padding(
+        padding: EdgeInsets.only(top: totalAppBarHeight),
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _ChatsTab(),
+            _MentorsTab(),
+            _RequestsTab(),
+          ],
         ),
       ),
     );
@@ -1575,119 +1727,589 @@ class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
   }
 }
 
-// --- StyledTabBar (Corrected for theme adaptation) ---
-class StyledTabBar extends StatelessWidget implements PreferredSizeWidget {
+// --- Premium Action Button Widget ---
+class _PremiumActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String tooltip;
+  final Gradient gradient;
+  final Color iconColor;
+
+  const _PremiumActionButton({
+    required this.icon,
+    required this.onPressed,
+    required this.tooltip,
+    required this.gradient,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: iconColor.withOpacity(0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: iconColor.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(14),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- Premium Tab Widget ---
+class _PremiumTab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PremiumTab({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tab(
+      height: 48,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Premium TabBar ---
+class _PremiumTabBar extends StatelessWidget implements PreferredSizeWidget {
   final TabController controller;
   final List<Widget> tabs;
 
-  const StyledTabBar({super.key, required this.controller, required this.tabs});
+  const _PremiumTabBar({
+    required this.controller,
+    required this.tabs,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final msgTheme = context.messagingTheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
       child: Container(
-        height: 48,
+        height: 56,
         decoration: BoxDecoration(
-            color: theme.brightness == Brightness.dark
-                ? msgTheme.tabBarBackgroundColor.withOpacity(0.9)
-                : theme.colorScheme.surface.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2))
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    Colors.white.withOpacity(0.08),
+                    Colors.white.withOpacity(0.04),
+                  ]
+                : [
+                    Colors.white.withOpacity(0.9),
+                    Colors.white.withOpacity(0.7),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.1)
+                : Colors.white.withOpacity(0.8),
+            width: 2,
+          ),
         ),
         child: TabBar(
           controller: controller,
           tabs: tabs,
           indicator: BoxDecoration(
-              color: msgTheme.tabBarIndicatorColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                    color: msgTheme.tabBarIndicatorColor.withOpacity(0.4),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2)
-                )
-              ]
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                theme.colorScheme.primary,
+                theme.colorScheme.secondary,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withOpacity(0.5),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: msgTheme.selectedTabTextColor,
-          unselectedLabelColor: theme.brightness == Brightness.dark
-              ? msgTheme.unselectedTabTextColor
-              : theme.colorScheme.onSurface.withOpacity(0.6),
-          splashBorderRadius: BorderRadius.circular(12),
-          labelStyle: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w700),
-          unselectedLabelStyle: theme.textTheme.labelLarge,
+          labelColor: Colors.white,
+          unselectedLabelColor: isDark
+              ? Colors.white.withOpacity(0.5)
+              : theme.colorScheme.onSurface.withOpacity(0.5),
+          splashBorderRadius: BorderRadius.circular(15),
           dividerColor: Colors.transparent,
+          indicatorPadding: const EdgeInsets.all(5),
+          padding: EdgeInsets.zero,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
         ),
       ),
     );
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize => const Size.fromHeight(76);
 }
 
+// --- Remove old StyledTabBar ---
 
-// --- _ChatsTab ---
-class _ChatsTab extends StatelessWidget {
-  const _ChatsTab({super.key});
+
+// --- _ChatsTab (Stunning Premium Design) ---
+class _ChatsTab extends StatefulWidget {
+  const _ChatsTab();
+
+  @override
+  State<_ChatsTab> createState() => _ChatsTabState();
+}
+
+class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin {
+  final TextEditingController _searchController = TextEditingController();
+  String _filter = '';
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<ChatRoom>>(
-      stream: MessagingService.getUserChatRooms(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
-        }
-        if (snapshot.hasError) {
-          return Center(
-              child: Text('Error: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.white70)));
-        }
-        final chatRooms = snapshot.data ?? [];
+    super.build(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-        if (chatRooms.isEmpty) {
-          return const Center( // Wrap EmptyStateWidget in Center
-            child: EmptyStateWidget(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'No Conversations Yet',
-              message: 'Start a chat with a mentor or discover public groups.',
-              // *** FIX: Removed style parameters ***
-              // titleStyle: TextStyle(color: emptyStateColor.withOpacity(0.9), fontSize: 20, fontWeight: FontWeight.w600),
-              // messageStyle: TextStyle(color: emptyStateColor, fontSize: 16),
-              actionButton: _DiscoverGroupsButton(), // Extracted button
+    return Column(
+      children: [
+        // Premium search bar - Clean background
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : theme.colorScheme.surface.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : theme.colorScheme.primary.withOpacity(0.08),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(isDark ? 0.15 : 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          );
-        }
+            child: Row(
+              children: [
+                // Search icon with gradient background
+                Container(
+                  margin: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary.withOpacity(0.15),
+                        theme.colorScheme.secondary.withOpacity(0.08),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.search_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                // Text field
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _filter = value.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: 'Search conversations...',
+                      hintStyle: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      filled: false,
+                      fillColor: Colors.transparent,
+                    ),
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                // Clear button
+                if (_filter.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          _searchController.clear();
+                          setState(() => _filter = '');
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: theme.colorScheme.error,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 12),
+              ],
+            ),
+          ),
+        ),
 
-        return AnimationLimiter(
-          child: ListView.builder(
-            key: key, // Use key passed from parent
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: chatRooms.length,
-            itemBuilder: (context, index) {
-              final chatRoom = chatRooms[index];
-              return StaggeredListItem(
-                index: index,
-                child: ChatListItem(
-                  chatRoom: chatRoom,
+        // Quick Actions Bar
+        _QuickActionsBar(),
+
+        // Chat List
+        Expanded(
+          child: StreamBuilder<List<ChatRoom>>(
+            stream: MessagingService.getUserChatRooms(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary.withOpacity(0.2),
+                              theme.colorScheme.secondary.withOpacity(0.1),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: theme.colorScheme.primary,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Loading conversations...',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.error.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Oops! Something went wrong',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final chatRooms = (snapshot.data ?? []).where((r) {
+                if (_filter.isEmpty) return true;
+                final name = (r.name.isNotEmpty ? r.name : 'Private Chat').toLowerCase();
+                final desc = (r.description ?? '').toLowerCase();
+                return name.contains(_filter) || desc.contains(_filter);
+              }).toList();
+
+              if (chatRooms.isEmpty) {
+                return const Center(
+                  child: EmptyStateWidget(
+                    icon: Icons.forum_rounded,
+                    title: 'No Conversations Yet',
+                    message: 'Start chatting with mentors or join groups to get started!',
+                    actionButton: _DiscoverGroupsButton(),
+                  ),
+                );
+              }
+
+              return AnimationLimiter(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  itemCount: chatRooms.length,
+                  itemBuilder: (context, index) {
+                    final chatRoom = chatRooms[index];
+                    return StaggeredListItem(
+                      index: index,
+                      duration: const Duration(milliseconds: 450),
+                      verticalOffset: 30.0,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ChatListItem(chatRoom: chatRoom),
+                      ),
+                    );
+                  },
                 ),
               );
             },
           ),
-        );
-      },
+        ),
+      ],
+    );
+  }
+}
+
+// --- Quick Actions Bar Widget - FIXED to match search bar width ---
+class _QuickActionsBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16), // Match search bar padding
+      child: Row(
+        children: [
+          Expanded(
+            child: _QuickActionChip(
+              icon: Icons.explore_rounded,
+              label: 'Discover',
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.tertiary.withOpacity(0.2),
+                  theme.colorScheme.tertiary.withOpacity(0.1),
+                ],
+              ),
+              iconColor: theme.colorScheme.tertiary,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PublicGroupsPage()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _QuickActionChip(
+              icon: Icons.people_rounded,
+              label: 'People',
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary.withOpacity(0.2),
+                  theme.colorScheme.primary.withOpacity(0.1),
+                ],
+              ),
+              iconColor: theme.colorScheme.primary,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserSearchPage()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _QuickActionChip(
+              icon: Icons.star_rounded,
+              label: 'Favorites',
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.warningColor.withOpacity(0.2),
+                  AppTheme.warningColor.withOpacity(0.1),
+                ],
+              ),
+              iconColor: AppTheme.warningColor,
+              onTap: () {
+                // TODO: Filter favorites
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Quick Action Chip Widget - REFINED to fill available space ---
+class _QuickActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Gradient gradient;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _QuickActionChip({
+    required this.icon,
+    required this.label,
+    required this.gradient,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 48, // Fixed height for consistency
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: iconColor.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: iconColor.withOpacity(0.12),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center, // Center content
+            mainAxisSize: MainAxisSize.max, // Fill available space
+            children: [
+              Icon(icon, color: iconColor, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.9)
+                        : theme.colorScheme.onSurface.withOpacity(0.8),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    letterSpacing: 0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1713,9 +2335,9 @@ class _DiscoverGroupsButton extends StatelessWidget {
 }
 
 
-// --- _MentorsTab ---
+// --- _MentorsTab (Stunning Premium Cards) ---
 class _MentorsTab extends StatelessWidget {
-  const _MentorsTab({super.key});
+  const _MentorsTab();
 
   @override
   Widget build(BuildContext context) {
@@ -1725,11 +2347,71 @@ class _MentorsTab extends StatelessWidget {
       future: MessagingService.getMentors(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.secondary.withOpacity(0.2),
+                        theme.colorScheme.secondary.withOpacity(0.1),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: theme.colorScheme.secondary,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading mentors...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
+
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load mentors',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
+
         final mentors = snapshot.data ?? [];
 
         if (mentors.isEmpty) {
@@ -1737,38 +2419,27 @@ class _MentorsTab extends StatelessWidget {
             child: EmptyStateWidget(
               icon: Icons.volunteer_activism_outlined,
               title: 'No Mentors Available',
-              message: 'Check back later for available mentors.',
-              // *** FIX: Removed style parameters ***
-              // titleStyle: TextStyle(color: emptyStateColor.withOpacity(0.9), fontSize: 20, fontWeight: FontWeight.w600),
-              // messageStyle: TextStyle(color: emptyStateColor, fontSize: 16),
+              message: 'Check back later for available mentors to connect with.',
             ),
           );
         }
 
         return AnimationLimiter(
           child: ListView.builder(
-            key: key, // Use key
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             itemCount: mentors.length,
             itemBuilder: (context, index) {
               final mentor = mentors[index];
               return StaggeredListItem(
                 index: index,
-                child: UserProfileTile(
-                  user: mentor,
-                  trailing: ElevatedButton(
-                    onPressed: () => _sendChatRequest(context, mentor),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(80, 36),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Chat'),
+                duration: const Duration(milliseconds: 450),
+                verticalOffset: 30.0,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _PremiumMentorCard(
+                    mentor: mentor,
+                    onChat: () => _sendChatRequest(context, mentor),
                   ),
-                  onTap: () {
-                    // Optional: Navigate to full mentor profile
-                  },
                 ),
               );
             },
@@ -1777,58 +2448,483 @@ class _MentorsTab extends StatelessWidget {
       },
     );
   }
+
   void _sendChatRequest(BuildContext context, UserProfile mentor) {
     showDialog(
       context: context,
+      barrierColor: Colors.black54,
       builder: (context) => _ChatRequestDialog(mentor: mentor),
     );
   }
 }
 
-// --- _RequestsTab ---
+// --- Premium Mentor Card Widget - REFINED ---
+class _PremiumMentorCard extends StatelessWidget {
+  final UserProfile mentor;
+  final VoidCallback onChat;
+
+  const _PremiumMentorCard({
+    required this.mentor,
+    required this.onChat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  Colors.white.withOpacity(0.08),
+                  Colors.white.withOpacity(0.05),
+                ]
+              : [
+                  Colors.white,
+                  Colors.white.withOpacity(0.95),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.12)
+              : theme.colorScheme.primary.withOpacity(0.08),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(isDark ? 0.12 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onChat,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // Avatar with gradient border - REFINED
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.secondary,
+                            theme.colorScheme.primary,
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.secondary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? theme.colorScheme.surface
+                              : Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: mentor.avatarUrl.isNotEmpty
+                              ? Image.network(
+                                  mentor.avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.volunteer_activism_rounded,
+                                    color: theme.colorScheme.secondary,
+                                    size: 30,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.volunteer_activism_rounded,
+                                  color: theme.colorScheme.secondary,
+                                  size: 30,
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Info - REFINED
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  mentor.displayName,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17,
+                                    letterSpacing: -0.5,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.school_rounded,
+                                size: 15,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  mentor.school,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Verified badge - REFINED
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.secondary.withOpacity(0.2),
+                            theme.colorScheme.secondary.withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: theme.colorScheme.secondary.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.verified_rounded,
+                        size: 18,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Chat button - Full width, more prominent
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onChat,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
+                            SizedBox(width: 10),
+                            Text(
+                              'Send Chat Request',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- _RequestsTab (Premium Badge Design) ---
 class _RequestsTab extends ConsumerWidget {
-  const _RequestsTab({super.key});
+  const _RequestsTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
 
     return StreamBuilder<List<ChatRequest>>(
       stream: MessagingService.getChatRequests(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.accentColor.withOpacity(0.2),
+                        AppTheme.accentColor.withOpacity(0.1),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: AppTheme.accentColor,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading requests...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
+
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
+          final errorMessage = snapshot.error.toString();
+          final isPermissionError = errorMessage.contains('permission-denied') || 
+                                   errorMessage.contains('Permission denied');
+          
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isPermissionError ? Icons.lock_outline_rounded : Icons.error_outline_rounded,
+                      size: 48,
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isPermissionError ? 'Permission Required' : 'Failed to load requests',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      height: 1.4,
+                    ),
+                  ),
+                  if (isPermissionError) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Check Firestore security rules for chat_requests collection',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
         }
+
         final requests = snapshot.data ?? [];
 
         if (requests.isEmpty) {
           return const Center(
             child: EmptyStateWidget(
-              icon: Icons.person_add_disabled_rounded,
-              title: 'No Pending Requests',
-              message: 'You have no incoming chat requests.',
-              // *** FIX: Removed style parameters ***
-              // titleStyle: TextStyle(color: emptyStateColor.withOpacity(0.9), fontSize: 20, fontWeight: FontWeight.w600),
-              // messageStyle: TextStyle(color: emptyStateColor, fontSize: 16),
+              icon: Icons.mark_chat_read_rounded,
+              title: 'All Caught Up!',
+              message: 'You have no pending chat requests at the moment.',
             ),
           );
         }
 
-        return AnimationLimiter(
-          child: ListView.builder(
-            key: key, // Use key
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: requests.length,
-            itemBuilder: (context, index) {
-              final request = requests[index];
-              return StaggeredListItem(
-                index: index,
-                child: RequestTile(request: request),
-              );
-            },
-          ),
+        return Column(
+          children: [
+            // Header with count
+            Container(
+              margin: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.accentColor.withOpacity(0.15),
+                    AppTheme.accentColor.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppTheme.accentColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.notifications_active_rounded,
+                      color: AppTheme.accentColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pending Requests',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          '${requests.length} ${requests.length == 1 ? 'person wants' : 'people want'} to connect',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.accentColor, AppTheme.accentColor.withOpacity(0.8)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${requests.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: AnimationLimiter(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  itemCount: requests.length,
+                  itemBuilder: (context, index) {
+                    final request = requests[index];
+                    return StaggeredListItem(
+                      index: index,
+                      duration: const Duration(milliseconds: 450),
+                      verticalOffset: 30.0,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: RequestTile(request: request),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1836,10 +2932,11 @@ class _RequestsTab extends ConsumerWidget {
 }
 
 
-// --- _ChatRequestDialog (Style Improvements) ---
+// --- _ChatRequestDialog (Modern, Beautiful Design) ---
 class _ChatRequestDialog extends StatefulWidget {
   final UserProfile mentor;
   const _ChatRequestDialog({required this.mentor});
+
   @override
   State<_ChatRequestDialog> createState() => _ChatRequestDialogState();
 }
@@ -1856,7 +2953,8 @@ class _ChatRequestDialogState extends State<_ChatRequestDialog> {
 
   Future<void> _sendRequest() async {
     setState(() => _loading = true);
-    final scaffoldMessenger = ScaffoldMessenger.of(context); // Store for async use
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     try {
       await MessagingService.sendChatRequest(
         targetUserId: widget.mentor.uid,
@@ -1866,25 +2964,43 @@ class _ChatRequestDialogState extends State<_ChatRequestDialog> {
       );
       if (mounted) {
         Navigator.pop(context);
-        scaffoldMessenger.showSnackBar( // Use stored messenger
-          const SnackBar(
-            content: Text('Chat request sent successfully!'),
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Chat request sent to ${widget.mentor.displayName}!',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppTheme.successColor,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            margin: EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar( // Use stored messenger
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('Failed to send request: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Failed: $e')),
+              ],
+            ),
             backgroundColor: AppTheme.errorColor,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            margin: EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -1896,93 +3012,152 @@ class _ChatRequestDialogState extends State<_ChatRequestDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 8,
       backgroundColor: theme.colorScheme.surface,
-      elevation: 5,
-      title: Row(
-        children: [
-          Icon(Icons.send_rounded, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          const Text('Send Chat Request'),
-        ],
-      ),
-      titleTextStyle: theme.textTheme.titleLarge,
-      contentTextStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.8)),
-      content: SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              theme.colorScheme.surface,
+              theme.colorScheme.surface.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Send a request to chat with ${widget.mentor.displayName}.'),
-            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary.withOpacity(0.15),
+                        theme.colorScheme.secondary.withOpacity(0.10),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.send_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Send Request',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'to ${widget.mentor.displayName}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Add a message (optional)',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _messageController,
-              decoration: InputDecoration(
-                labelText: 'Message (Optional)',
-                hintText: 'Add a brief message...',
-                prefixIcon: Icon(Icons.message_outlined, size: 20),
-                // Ensure input decoration uses theme defaults
-              ),
-              maxLines: 3,
-              minLines: 1,
+              maxLines: 4,
+              minLines: 3,
               textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: 'Hi! I\'d like to connect with you...',
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.4),
+                ),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(16),
+              ),
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _loading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      side: BorderSide(
+                        color: theme.colorScheme.outline.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading ? null : _sendRequest,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 20),
+                    label: Text(_loading ? 'Sending...' : 'Send Request'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shadowColor: theme.colorScheme.primary.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      actions: [
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          icon: _loading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.send_rounded, size: 18),
-          label: const Text('Send'),
-          onPressed: _loading ? null : _sendRequest,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          ),
-        ),
-      ],
     );
   }
 }
-
-
-// --- EmptyStateWidget Extension (For reference, no changes needed if widget is correct) ---
-// Add these properties to your EmptyStateWidget class if they don't exist
-/*
-class EmptyStateWidget extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  final Widget? actionButton;
-  final TextStyle? titleStyle; // Add this
-  final TextStyle? messageStyle; // Add this
-
-  const EmptyStateWidget({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.actionButton,
-    this.titleStyle, // Add this
-    this.messageStyle, // Add this
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // ... rest of build method, using titleStyle and messageStyle if provided ...
-    // Example:
-    // Text(title, style: titleStyle ?? theme.textTheme.headlineSmall?.copyWith(...))
-    // Text(message, style: messageStyle ?? theme.textTheme.bodyLarge?.copyWith(...))
-  }
-}
-*/

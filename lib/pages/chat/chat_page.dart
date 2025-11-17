@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../services/chat_service.dart';
 
 class ChatPage extends StatefulWidget {
@@ -13,7 +14,9 @@ class _ChatPageState extends State<ChatPage>
     with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   late AnimationController _fadeController;
+  late AnimationController _floatController;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _floatAnimation;
 
   @override
   void initState() {
@@ -25,12 +28,22 @@ class _ChatPageState extends State<ChatPage>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
+    
+    _floatController = AnimationController(
+      duration: const Duration(seconds: 20),
+      vsync: this,
+    )..repeat();
+    _floatAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.linear),
+    );
+    
     _fadeController.forward();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
+    _floatController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -38,10 +51,23 @@ class _ChatPageState extends State<ChatPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
+          // Animated background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _BackgroundPainter(
+                animation: _floatAnimation,
+                isDark: isDark,
+              ),
+            ),
+          ),
+          // Content
+          Column(
+            children: [
           // Custom App Bar
           Container(
             padding: EdgeInsets.only(
@@ -132,6 +158,8 @@ class _ChatPageState extends State<ChatPage>
           
           // Input Area
           _buildInputArea(theme),
+            ],
+          ),
         ],
       ),
     );
@@ -344,6 +372,59 @@ class _ChatPageState extends State<ChatPage>
       return '${date.day}/${date.month}';
     }
   }
+}
+
+class _BackgroundPainter extends CustomPainter {
+  final Animation<double> animation;
+  final bool isDark;
+
+  _BackgroundPainter({required this.animation, required this.isDark})
+      : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    
+    // Debug: Print to verify paint method is being called
+    print('BackgroundPainter paint called - Size: ${size.width}x${size.height}, Animation: ${animation.value}');
+
+    // Test with solid, highly visible colors first
+    final testColors = [
+      Colors.blue.withOpacity(0.5),
+      Colors.pink.withOpacity(0.5),
+      Colors.purple.withOpacity(0.5),
+      Colors.green.withOpacity(0.5),
+      Colors.orange.withOpacity(0.5),
+    ];
+
+    // Large test bubbles - very visible
+    paint.color = testColors[0];
+    canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.3), 80, paint);
+    
+    paint.color = testColors[1];
+    canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.6), 100, paint);
+    
+    paint.color = testColors[2];
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.8), 60, paint);
+
+    // Medium test bubbles
+    paint.color = testColors[3];
+    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.45), 50, paint);
+    canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.25), 50, paint);
+    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.75), 50, paint);
+
+    // Small test bubbles
+    paint.color = testColors[4];
+    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.2), 30, paint);
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.4), 30, paint);
+    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.65), 30, paint);
+    canvas.drawCircle(Offset(size.width * 0.75, size.height * 0.1), 30, paint);
+
+    print('Painted 10 test bubbles with solid colors');
+  }
+
+  @override
+  bool shouldRepaint(_BackgroundPainter oldDelegate) => true;
 }
 
 

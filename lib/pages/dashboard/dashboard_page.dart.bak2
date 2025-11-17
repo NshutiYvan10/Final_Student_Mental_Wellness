@@ -69,8 +69,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 _buildPremiumHeader(theme, isDark),
                 const SizedBox(height: 24),
                 _buildPremiumMoodCard(theme, isDark),
-                const SizedBox(height: 16),
-                _buildMotivationalQuote(theme, isDark),
+                const SizedBox(height: 20),
+                _buildDailyInspiration(theme, isDark),
                 const SizedBox(height: 20),
                 _buildStatsRow(theme, isDark),
                 const SizedBox(height: 20),
@@ -181,59 +181,54 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         
         return GestureDetector(
           onTap: () => Navigator.pushNamed(context, '/mood/logger'),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark 
-                      ? Colors.black.withOpacity(0.3)
-                      : theme.colorScheme.primary.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              Colors.white.withOpacity(0.1),
-                              Colors.white.withOpacity(0.05),
-                            ]
-                          : [
-                              theme.colorScheme.primary.withOpacity(0.9),
-                              theme.colorScheme.secondary.withOpacity(0.9),
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.4),
-                      width: 1.5,
-                    ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: isDark ? 20 : 0, sigmaY: isDark ? 20 : 0),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? [
+                            Colors.white.withOpacity(0.08),
+                            Colors.white.withOpacity(0.05),
+                          ]
+                        : [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.secondary,
+                          ],
                   ),
-                  child: Column(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.12)
+                        : Colors.white.withOpacity(0.3),
+                    width: isDark ? 1.5 : 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark 
+                          ? theme.colorScheme.primary.withOpacity(0.1)
+                          : theme.colorScheme.primary.withOpacity(0.3),
+                      blurRadius: isDark ? 20 : 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Log Your Mood',
+                          hasMood ? 'Today\'s Mood' : 'Log Your Mood',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
-                            fontSize: 20,
                           ),
                         ),
                         Container(
@@ -259,240 +254,101 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    // Always show the same design regardless of mood state
-                    Row(
-                      children: [
-                        // Animated gradient icon container
-                        Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: isDark
-                                  ? [
-                                      theme.colorScheme.primary.withOpacity(0.3),
-                                      theme.colorScheme.secondary.withOpacity(0.2),
-                                    ]
-                                  : [
-                                      Colors.white.withOpacity(0.4),
-                                      Colors.white.withOpacity(0.2),
-                                    ],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
+                    const SizedBox(height: 24),
+                    if (hasMood) ...[
+                      // Beautiful mood display with elegant illustration
+                      Row(
+                        children: [
+                          // Premium mood illustration with glow effect
+                          Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
-                              width: 1.5,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.white.withOpacity(0.3),
+                                  blurRadius: 24,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                _getPremiumMoodIcon(todaysMood.moodType),
+                                style: const TextStyle(
+                                  fontSize: 56,
+                                  height: 1.0,
+                                ),
+                              ),
                             ),
                           ),
-                          child: Icon(
-                            Icons.psychology_alt_rounded,
-                            size: 36,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        // Text content
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Track Your Mood',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getMoodLabel(todaysMood.moodType),
+                                  style: theme.textTheme.headlineMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Tap to log how you\'re feeling today',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withOpacity(0.85),
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 14,
+                                const SizedBox(height: 8),
+                                Text(
+                                  _getPremiumMoodDescription(todaysMood.moodType),
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontWeight: FontWeight.w500,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.4,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                        ],
+                      ),
+                    ] else ...[
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? theme.colorScheme.primary.withOpacity(0.15)
+                                    : Colors.white.withOpacity(0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.favorite_border_rounded,
+                                size: 48,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Tap to log how you\'re feeling',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
-                ),
                 ),
               ),
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildMotivationalQuote(ThemeData theme, bool isDark) {
-    // Rotating motivational quotes
-    final quotes = [
-      {
-        'quote': 'The only way to do great work is to love what you do.',
-        'author': 'Steve Jobs'
-      },
-      {
-        'quote': 'Believe you can and you\'re halfway there.',
-        'author': 'Theodore Roosevelt'
-      },
-      {
-        'quote': 'Your mental health is a priority. Your happiness is essential. Your self-care is a necessity.',
-        'author': 'Unknown'
-      },
-      {
-        'quote': 'It\'s okay to not be okay. What\'s not okay is to stay that way.',
-        'author': 'Unknown'
-      },
-      {
-        'quote': 'You don\'t have to be positive all the time. It\'s perfectly okay to feel sad, angry, annoyed, frustrated, scared, or anxious. Having feelings doesn\'t make you a negative person. It makes you human.',
-        'author': 'Lori Deschene'
-      },
-      {
-        'quote': 'Healing takes time, and asking for help is a courageous step.',
-        'author': 'Mariska Hargitay'
-      },
-    ];
-    
-    // Use day of year to rotate quotes daily
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
-    final quote = quotes[dayOfYear % quotes.length];
-    
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: isDark 
-                ? Colors.black.withOpacity(0.3)
-                : const Color(0xFF667eea).withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                        Colors.white.withOpacity(0.1),
-                        Colors.white.withOpacity(0.05),
-                      ]
-                    : [
-                        const Color(0xFF667eea).withOpacity(0.9),
-                        const Color(0xFF764ba2).withOpacity(0.9),
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark 
-                    ? Colors.white.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.4),
-                width: 1.5,
-              ),
-            ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Quote icon
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            theme.colorScheme.primary.withOpacity(0.3),
-                            theme.colorScheme.secondary.withOpacity(0.2),
-                          ]
-                        : [
-                            Colors.white.withOpacity(0.25),
-                            Colors.white.withOpacity(0.15),
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(isDark ? 0.2 : 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Icon(
-                  Icons.format_quote_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Quote content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      quote['quote']!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.95),
-                        fontWeight: FontWeight.w400,
-                        fontStyle: FontStyle.italic,
-                        height: 1.5,
-                        fontSize: 14.5,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          width: 30,
-                          height: 1.5,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.5),
-                                Colors.white.withOpacity(0.1),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            quote['author']!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withOpacity(0.7),
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -695,47 +551,40 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     required String subtitle,
     required List<Color> gradientColors,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: isDark 
-                ? Colors.black.withOpacity(0.3)
-                : gradientColors[0].withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                        Colors.white.withOpacity(0.1),
-                        Colors.white.withOpacity(0.05),
-                      ]
-                    : [
-                        gradientColors[0].withOpacity(0.9),
-                        gradientColors[1].withOpacity(0.9),
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.4),
-                width: 1.5,
-              ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: isDark ? 20 : 0, sigmaY: isDark ? 20 : 0),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.05),
+                    ]
+                  : gradientColors,
             ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : Colors.white.withOpacity(0.3),
+              width: isDark ? 1.5 : 2,
+            ),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: gradientColors[0].withOpacity(0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -780,7 +629,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 ),
               ),
             ],
-          ),
           ),
         ),
       ),
@@ -874,58 +722,46 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   }) {
     return GestureDetector(
       onTap: () {
-        Navigator.pushNamed(
-          context, 
-          '/meditation',
-          arguments: {
-            'type': title,
-            'icon': icon,
-            'colors': gradientColors,
-          },
-        );
+        Navigator.pushNamed(context, '/meditation');
       },
-      child: Container(
-        width: 200,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: isDark 
-                  ? Colors.black.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.05),
-                        ]
-                      : [
-                          Colors.white.withOpacity(0.9),
-                          Colors.grey.shade50.withOpacity(0.9),
-                        ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.2)
-                      : gradientColors[0].withOpacity(0.2),
-                  width: 1.5,
-                ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: isDark ? 20 : 0, sigmaY: isDark ? 20 : 0),
+          child: Container(
+            width: 200,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withOpacity(0.08),
+                        Colors.white.withOpacity(0.05),
+                      ]
+                    : [
+                        Colors.white,
+                        Colors.grey.shade50,
+                      ],
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : gradientColors[0].withOpacity(0.15),
+                width: isDark ? 1.5 : 2,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: gradientColors[0].withOpacity(0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -965,7 +801,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   ),
                 ),
               ],
-            ),
             ),
           ),
         ),
@@ -1037,47 +872,43 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   ) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: isDark 
-                  ? Colors.black.withOpacity(0.3)
-                  : gradientColors[0].withOpacity(0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.05),
-                        ]
-                      : [
-                          Colors.white.withOpacity(0.9),
-                          Colors.grey.shade50.withOpacity(0.9),
-                        ],
-                ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.2)
-                      : gradientColors[0].withOpacity(0.2),
-                  width: 1.5,
-                ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: isDark ? 20 : 0, sigmaY: isDark ? 20 : 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withOpacity(0.08),
+                        Colors.white.withOpacity(0.05),
+                      ]
+                    : [
+                        Colors.white,
+                        Colors.grey.shade50,
+                      ],
               ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : gradientColors[0].withOpacity(0.15),
+                width: isDark ? 1.5 : 2,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: gradientColors[0].withOpacity(0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
             child: Column(
               children: [
                 Container(
@@ -1106,7 +937,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   ),
                 ),
               ],
-            ),
             ),
           ),
         ),
@@ -1287,31 +1117,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     }
   }
 
-  String _getPremiumMoodIcon(MoodType? mood) {
-    switch (mood) {
-      case MoodType.veryHappy:
-        return '🌟';
-      case MoodType.happy:
-        return '😊';
-      case MoodType.neutral:
-        return '😐';
-      case MoodType.sad:
-        return '😢';
-      case MoodType.verySad:
-        return '💔';
-      case MoodType.anxious:
-        return '😰';
-      case MoodType.angry:
-        return '😤';
-      case MoodType.stressed:
-        return '😫';
-      case MoodType.calm:
-        return '😌';
-      case MoodType.energetic:
-        return '⚡';
-      default:
-        return '💭';
-    }
   }
 
   String _getMoodLabel(MoodType? mood) {

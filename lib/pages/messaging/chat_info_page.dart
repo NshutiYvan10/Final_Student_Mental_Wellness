@@ -1,342 +1,3 @@
-// import 'dart:ui';
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:flutter/material.dart';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-// import '../../models/chat_models.dart';
-// import '../../models/user_profile.dart';
-// import '../../services/auth_service.dart';
-// import '../../services/messaging_service.dart';
-// import '../../theme/app_theme.dart';
-// import '../../theme/messaging_theme.dart';
-// import '../../widgets/animations/staggered_list_item.dart';
-// import '../../widgets/gradient_background.dart';
-// import '../../widgets/gradient_card.dart';
-// import '../../widgets/messaging/user_profile_tile.dart';
-//
-// class ChatInfoPage extends ConsumerStatefulWidget {
-//   final ChatRoom chatRoom;
-//   const ChatInfoPage({super.key, required this.chatRoom});
-//
-//   @override
-//   ConsumerState<ChatInfoPage> createState() => _ChatInfoPageState();
-// }
-//
-// class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
-//   List<UserProfile> _members = [];
-//   bool _isLoadingMembers = true;
-//   UserProfile? _currentUser;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _loadCurrentUserAndMembers();
-//   }
-//
-//   Future<void> _loadCurrentUserAndMembers() async {
-//     final user = await AuthService.getCurrentUserProfile();
-//     if (!mounted) return;
-//     setState(() {
-//       _currentUser = user;
-//     });
-//     _loadMembers();
-//   }
-//
-//   Future<void> _loadMembers() async {
-//     if (!mounted) return;
-//     setState(() => _isLoadingMembers = true);
-//     try {
-//       List<UserProfile> fetchedMembers = [];
-//       List<String> memberIds = List.from(widget.chatRoom.memberIds);
-//
-//       if (_currentUser != null && memberIds.contains(_currentUser!.uid)) {
-//         fetchedMembers.add(_currentUser!);
-//         memberIds.remove(_currentUser!.uid);
-//       }
-//
-//       if (memberIds.isNotEmpty) {
-//         // Fetch in chunks of 10 (Firestore 'in' limit)
-//         for (var i = 0; i < memberIds.length; i += 10) {
-//           final chunk = memberIds.sublist(
-//               i, i + 10 > memberIds.length ? memberIds.length : i + 10);
-//           if (chunk.isNotEmpty) {
-//             final snapshot = await FirebaseFirestore.instance
-//                 .collection('users')
-//                 .where(FieldPath.documentId, whereIn: chunk)
-//                 .get();
-//             fetchedMembers.addAll(
-//                 snapshot.docs.map((doc) => UserProfile.fromMap(doc.data())));
-//           }
-//         }
-//       }
-//
-//       fetchedMembers = fetchedMembers.toSet().toList(); // Deduplicate
-//       fetchedMembers.sort((a, b) => a.displayName.compareTo(b.displayName));
-//
-//       if (mounted) {
-//         setState(() {
-//           _members = fetchedMembers;
-//           _isLoadingMembers = false;
-//         });
-//       }
-//     } catch (e) {
-//       print("Error loading members: $e");
-//       if (mounted) setState(() => _isLoadingMembers = false);
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//             content: Text('Error loading members: $e'),
-//             backgroundColor: Colors.red),
-//       );
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final theme = Theme.of(context);
-//     final msgTheme = context.messagingTheme;
-//     final bool isGroup = widget.chatRoom.type == ChatType.group;
-//     final bool isCreator = widget.chatRoom.createdBy == _currentUser?.uid;
-//
-//     return Scaffold(
-//       extendBodyBehindAppBar: true,
-//       backgroundColor: Colors.transparent,
-//       appBar: AppBar(
-//         backgroundColor: Colors.transparent,
-//         elevation: 0,
-//         foregroundColor: Colors.white,
-//         title: Text(isGroup ? 'Group Info' : 'Chat Info',
-//             style: const TextStyle(color: Colors.white)),
-//         flexibleSpace: ClipRRect(
-//           child: BackdropFilter(
-//             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-//             child: Container(
-//               color: msgTheme.inputBackgroundColor.withOpacity(0.7),
-//               decoration: BoxDecoration(
-//                   border: Border(
-//                       bottom:
-//                       BorderSide(color: Colors.white.withOpacity(0.1), width: 1))),
-//             ),
-//           ),
-//         ),
-//       ),
-//       body: GradientBackground(
-//         child: SafeArea(
-//           child: ListView(
-//             padding: const EdgeInsets.all(16.0),
-//             children: [
-//               // Header
-//               _buildInfoHeader(context),
-//               const SizedBox(height: 24),
-//
-//               // Members List
-//               if (isGroup) _buildMembersSection(context, isCreator),
-//
-//               // Actions
-//               const SizedBox(height: 24),
-//               _buildActionsSection(context, isGroup),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-//
-//   Widget _buildInfoHeader(BuildContext context) {
-//     final theme = Theme.of(context);
-//     final isGroup = widget.chatRoom.type == ChatType.group;
-//
-//     return Center(
-//       child: Column(
-//         children: [
-//           CircleAvatar(
-//             radius: 45,
-//             backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-//             child: Icon(
-//               isGroup ? Icons.group_rounded : Icons.person_rounded,
-//               color: theme.colorScheme.primary,
-//               size: 45,
-//             ),
-//           ),
-//           const SizedBox(height: 16),
-//           Text(
-//             widget.chatRoom.name.isEmpty && !isGroup
-//                 ? 'Private Chat'
-//                 : widget.chatRoom.name,
-//             style: theme.textTheme.headlineSmall
-//                 ?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
-//             textAlign: TextAlign.center,
-//           ),
-//           if (widget.chatRoom.description != null &&
-//               widget.chatRoom.description!.isNotEmpty) ...[
-//             const SizedBox(height: 8),
-//             Text(
-//               widget.chatRoom.description!,
-//               style: theme.textTheme.bodyLarge?.copyWith(
-//                 color: Colors.white.withOpacity(0.7),
-//               ),
-//               textAlign: TextAlign.center,
-//             ),
-//           ],
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _buildMembersSection(BuildContext context, bool isCreator) {
-//     final theme = Theme.of(context);
-//
-//     return GradientCard(
-//       padding: const EdgeInsets.all(16.0),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//             children: [
-//               Text(
-//                 'Members (${_isLoadingMembers ? '...' : _members.length})',
-//                 style: theme.textTheme.titleMedium
-//                     ?.copyWith(fontWeight: FontWeight.w600),
-//               ),
-//               if (isCreator)
-//                 IconButton(
-//                   icon: Icon(Icons.person_add_alt_1_rounded,
-//                       color: theme.colorScheme.primary),
-//                   onPressed: _addMembers,
-//                   tooltip: 'Add Members',
-//                 ),
-//             ],
-//           ),
-//           const SizedBox(height: 8),
-//           _isLoadingMembers
-//               ? const Center(
-//               child: Padding(
-//                   padding: EdgeInsets.all(16.0),
-//                   child: CircularProgressIndicator()))
-//               : _members.isEmpty
-//               ? Padding(
-//             padding: const EdgeInsets.symmetric(vertical: 16.0),
-//             child: Text(
-//               'No members found.',
-//               style: TextStyle(
-//                   color: theme.colorScheme.onSurface.withOpacity(0.6)),
-//             ),
-//           )
-//               : AnimationLimiter(
-//             child: ListView.builder(
-//               shrinkWrap: true,
-//               physics: const NeverScrollableScrollPhysics(),
-//               itemCount: _members.length,
-//               itemBuilder: (context, index) {
-//                 final member = _members[index];
-//                 return StaggeredListItem(
-//                   index: index,
-//                   child: UserProfileTile(
-//                     user: member,
-//                     trailing: member.uid == widget.chatRoom.createdBy
-//                         ? Text('Admin',
-//                         style: theme.textTheme.labelSmall
-//                             ?.copyWith(
-//                             color: theme.colorScheme.secondary))
-//                         : null,
-//                   ),
-//                 );
-//               },
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   void _addMembers() {
-//     ScaffoldMessenger.of(context).showSnackBar(
-//       const SnackBar(content: Text('Add member functionality TBD')),
-//     );
-//   }
-//
-//   Widget _buildActionsSection(BuildContext context, bool isGroup) {
-//     final theme = Theme.of(context);
-//
-//     return Column(
-//       children: [
-//         if (isGroup)
-//           GradientCard(
-//             padding: const EdgeInsets.all(4),
-//             onTap: _confirmLeaveGroup,
-//             child: ListTile(
-//               leading:
-//               Icon(Icons.exit_to_app_rounded, color: theme.colorScheme.error),
-//               title: Text('Leave Group',
-//                   style: TextStyle(color: theme.colorScheme.error)),
-//               tileColor: theme.colorScheme.error.withOpacity(0.05),
-//               shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(12)),
-//             ),
-//           ),
-//       ],
-//     );
-//   }
-//
-//   void _confirmLeaveGroup() {
-//     showDialog(
-//       context: context,
-//       builder: (ctx) => AlertDialog(
-//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//         title: const Text('Leave Group?'),
-//         content: const Text(
-//             'Are you sure you want to leave this group? You will lose access to the chat history.'),
-//         actions: [
-//           TextButton(
-//             child: const Text('Cancel'),
-//             onPressed: () => Navigator.of(ctx).pop(),
-//           ),
-//           TextButton(
-//             child: Text('Leave',
-//                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
-//             onPressed: () async {
-//               Navigator.of(ctx).pop(); // Close dialog
-//               try {
-//                 await MessagingService.leaveGroupChat(widget.chatRoom.id);
-//                 if (mounted) {
-//                   int count = 0;
-//                   Navigator.of(context).popUntil((_) => count++ >= 2);
-//                   ScaffoldMessenger.of(context).showSnackBar(
-//                     const SnackBar(
-//                         content: Text('You have left the group'),
-//                         backgroundColor: Colors.green),
-//                   );
-//                 }
-//               } catch (e) {
-//                 if (mounted) {
-//                   ScaffoldMessenger.of(context).showSnackBar(
-//                     SnackBar(
-//                         content: Text('Failed to leave group: $e'),
-//                         backgroundColor: Colors.red),
-//                   );
-//                 }
-//               }
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -349,9 +10,7 @@ import '../../services/messaging_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/messaging_theme.dart';
 import '../../widgets/animations/staggered_list_item.dart';
-import '../../widgets/gradient_background.dart';
-import '../../widgets/gradient_card.dart';
-import '../../widgets/messaging/user_profile_tile.dart';
+import 'user_search_page.dart';
 
 class ChatInfoPage extends ConsumerStatefulWidget {
   final ChatRoom chatRoom;
@@ -388,13 +47,11 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
       List<UserProfile> fetchedMembers = [];
       List<String> memberIds = List.from(widget.chatRoom.memberIds);
 
-      // Add current user first if they are a member
       if (_currentUser != null && memberIds.contains(_currentUser!.uid)) {
         fetchedMembers.add(_currentUser!);
         memberIds.remove(_currentUser!.uid);
       }
 
-      // Fetch remaining members in chunks
       if (memberIds.isNotEmpty) {
         const chunkSize = 10;
         for (var i = 0; i < memberIds.length; i += chunkSize) {
@@ -411,8 +68,7 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
         }
       }
 
-      fetchedMembers = fetchedMembers.toSet().toList(); // Deduplicate
-      // Sort: Current user first, then admin, then alphabetically
+      fetchedMembers = fetchedMembers.toSet().toList();
       fetchedMembers.sort((a, b) {
         if (a.uid == _currentUser?.uid) return -1;
         if (b.uid == _currentUser?.uid) return 1;
@@ -420,7 +76,6 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
         if (b.uid == widget.chatRoom.createdBy) return 1;
         return a.displayName.compareTo(b.displayName);
       });
-
 
       if (mounted) {
         setState(() {
@@ -431,11 +86,15 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
     } catch (e) {
       print("Error loading members: $e");
       if (mounted) setState(() => _isLoadingMembers = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text('Error loading members: $e'),
-            backgroundColor: Colors.red),
-      );
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -443,61 +102,108 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final msgTheme = context.messagingTheme;
+    final isDark = theme.brightness == Brightness.dark;
     final bool isGroup = widget.chatRoom.type == ChatType.group;
     final bool isCreator = widget.chatRoom.createdBy == _currentUser?.uid;
 
-    // Determine AppBar foreground color
-    final appBarForegroundColor = theme.brightness == Brightness.dark
-        ? Colors.white
-        : theme.colorScheme.onSurface;
-
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent, // Use GradientBackground
-      appBar: AppBar(
-        iconTheme: IconThemeData(color: appBarForegroundColor), // Adapt icon color
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: appBarForegroundColor, // Adapt title color
-        title: Text(isGroup ? 'Group Info' : 'Chat Info',
-            style: TextStyle(color: appBarForegroundColor)),
-        flexibleSpace: ClipRRect( // Blurred background
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            // *** FIX: Moved color inside BoxDecoration ***
-            child: Container(
-              decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark // Adapt color
-                      ? msgTheme.inputBackgroundColor.withOpacity(0.75)
-                      : AppTheme.softBg.withOpacity(0.85),
-                  border: Border(
-                      bottom:
-                      BorderSide(
-                          color: theme.brightness == Brightness.dark
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.black.withOpacity(0.08),
-                          width: 1))),
-            ),
-          ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: msgTheme.chatRoomBackground is LinearGradient
+              ? msgTheme.chatRoomBackground as LinearGradient
+              : LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor.withOpacity(0.1),
+                    AppTheme.secondaryColor.withOpacity(0.1),
+                  ],
+                ),
         ),
-      ),
-      body: GradientBackground(
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
+          child: Column(
             children: [
-              // Header
-              _buildInfoHeader(context),
-              const SizedBox(height: 24),
+              // Premium Glass AppBar
+              PreferredSize(
+                preferredSize: const Size.fromHeight(70),
+                child: ClipRRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.black.withOpacity(0.3)
+                            : Colors.white.withOpacity(0.3),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.white.withOpacity(0.08),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        child: Row(
+                          children: [
+                            // Back Button
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => Navigator.pop(context),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: theme.colorScheme.onSurface,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Title
+                            Expanded(
+                              child: Text(
+                                isGroup ? 'Group Info' : 'Chat Info',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
-              // Members List (inside GradientCard)
-              if (isGroup) _buildMembersSection(context, isCreator),
+              // Scrollable Content
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  children: [
+                    // Header with Avatar and Title
+                    _buildInfoHeader(context, isDark),
+                    const SizedBox(height: 24),
 
-              // Actions (inside GradientCard)
-              const SizedBox(height: 24),
-              _buildActionsSection(context, isGroup),
+                    // Members Section for Groups
+                    if (isGroup) _buildMembersSection(context, isDark, isCreator),
 
-              const SizedBox(height: 20), // Bottom padding
+                    // Actions Section
+                    if (isGroup) ...[
+                      const SizedBox(height: 16),
+                      _buildActionsSection(context, isDark, isCreator),
+                    ],
+
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -505,46 +211,106 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
     );
   }
 
-  Widget _buildInfoHeader(BuildContext context) {
+  Widget _buildInfoHeader(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     final isGroup = widget.chatRoom.type == ChatType.group;
-    final heroTag = 'avatar-${widget.chatRoom.id}'; // Use consistent tag
+    final heroTag = 'avatar-${widget.chatRoom.id}';
 
     return Center(
       child: Column(
         children: [
-          // Use Hero animation if coming from chat room
+          // Avatar with Gradient Ring
           Hero(
             tag: heroTag,
-            child: CircleAvatar(
-              radius: 45,
-              backgroundColor: theme.colorScheme.surface.withOpacity(0.2), // Light background
-              child: Icon(
-                isGroup ? Icons.group_rounded : Icons.person_rounded,
-                color: Colors.white.withOpacity(0.8), // White icon
-                size: 45,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor.withOpacity(0.3),
+                    AppTheme.secondaryColor.withOpacity(0.3),
+                  ],
+                ),
               ),
-              // TODO: Add image support with background image
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark
+                      ? Colors.black.withOpacity(0.4)
+                      : Colors.white.withOpacity(0.4),
+                ),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: theme.colorScheme.surface.withOpacity(0.3),
+                  child: Icon(
+                    isGroup ? Icons.group_rounded : Icons.person_rounded,
+                    size: 50,
+                    color: isDark
+                        ? Colors.white.withOpacity(0.8)
+                        : Colors.black54,
+                  ),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          
+          // Chat/Group Name
           Text(
             widget.chatRoom.name.isEmpty && !isGroup
                 ? 'Private Chat'
                 : widget.chatRoom.name,
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
             textAlign: TextAlign.center,
           ),
+          
+          // Description
           if (widget.chatRoom.description != null &&
               widget.chatRoom.description!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               widget.chatRoom.description!,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white.withOpacity(0.7),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDark
+                    ? Colors.white.withOpacity(0.7)
+                    : Colors.black.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
+            ),
+          ],
+          
+          // Member Count
+          if (isGroup) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.people_rounded,
+                    size: 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${widget.chatRoom.memberIds.length} members',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -552,117 +318,306 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
     );
   }
 
-  Widget _buildMembersSection(BuildContext context, bool isCreator) {
+  Widget _buildMembersSection(BuildContext context, bool isDark, bool isCreator) {
     final theme = Theme.of(context);
 
-    return GradientCard( // Wrap members list in a card
-      padding: const EdgeInsets.all(16.0),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? theme.colorScheme.surface.withOpacity(0.5)
+            : Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Members (${_isLoadingMembers ? '...' : _members.length})',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor.withOpacity(0.2),
+                          AppTheme.secondaryColor.withOpacity(0.2),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.people_rounded,
+                      size: 20,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Members',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_members.length}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               if (isCreator)
-                IconButton(
-                  icon: Icon(Icons.person_add_alt_1_rounded,
-                      color: theme.colorScheme.primary),
-                  onPressed: _addMembers,
-                  tooltip: 'Add Members',
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryColor,
+                        AppTheme.secondaryColor,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _addMembers,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.person_add_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 12), // Increased spacing
-          Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.3)), // Add divider
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            color: theme.colorScheme.outline.withOpacity(0.2),
+          ),
+          const SizedBox(height: 16),
+          
+          // Members List
           _isLoadingMembers
-              ? const Center(
-              child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: CircularProgressIndicator()))
-              : _members.isEmpty
-              ? Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Text(
-              'No members found.',
-              style: TextStyle(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6)),
-            ),
-          )
-              : AnimationLimiter(
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _members.length,
-              itemBuilder: (context, index) {
-                final member = _members[index];
-                // Use UserProfileTile without the card background (already in GradientCard)
-                return StaggeredListItem(
-                  index: index,
+              ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0), // Spacing between members
-                    child: UserProfileTile(
-                      user: member,
-                      // Remove internal card styling from UserProfileTile if needed
-                      // or create a version without the outer card
-                      trailing: member.uid == widget.chatRoom.createdBy
-                          ? Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Text('Admin',
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(
-                                color: theme.colorScheme.secondary, fontWeight: FontWeight.bold)),
-                      )
-                          : null,
-                      onTap: () {
-                        // TODO: View profile?
-                      },
+                    padding: const EdgeInsets.symmetric(vertical: 32.0),
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryColor,
                     ),
                   ),
-                );
-              },
-            ),
-          ),
+                )
+              : _members.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(
+                        child: Text(
+                          'No members found',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ),
+                    )
+                  : AnimationLimiter(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _members.length,
+                        itemBuilder: (context, index) {
+                          final member = _members[index];
+                          final isAdmin = member.uid == widget.chatRoom.createdBy;
+                          final isCurrentUser = member.uid == _currentUser?.uid;
+                          
+                          return StaggeredListItem(
+                            index: index,
+                            child: _MemberTile(
+                              member: member,
+                              isAdmin: isAdmin,
+                              isCurrentUser: isCurrentUser,
+                              canRemove: isCreator && !isAdmin && !isCurrentUser,
+                              onRemove: () => _confirmRemoveMember(member),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
         ],
       ),
     );
   }
 
   void _addMembers() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Add member functionality TBD'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-        margin: EdgeInsets.all(12),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const UserSearchPage(),
       ),
     );
   }
 
-  Widget _buildActionsSection(BuildContext context, bool isGroup) {
+  void _confirmRemoveMember(UserProfile member) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Remove Member?'),
+        content: Text('Are you sure you want to remove ${member.displayName} from this group?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Remove', style: TextStyle(color: Colors.white)),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                // Note: You'll need to implement this method in MessagingService
+                // await MessagingService.removeMemberFromGroup(widget.chatRoom.id, member.uid);
+                _loadMembers(); // Reload members list
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${member.displayName} removed from group'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to remove member: $e'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsSection(BuildContext context, bool isDark, bool isCreator) {
     final theme = Theme.of(context);
 
-    // Only show actions if they are relevant (e.g., leaving a group)
-    if (!isGroup) return const SizedBox.shrink(); // No actions for private chat info yet
-
-    return GradientCard( // Wrap actions in card
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? theme.colorScheme.surface.withOpacity(0.5)
+            : Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          if (isGroup)
-            ListTile(
-              leading: Icon(Icons.exit_to_app_rounded, color: theme.colorScheme.error),
-              title: Text('Leave Group', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w600)),
+          // Leave Group
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
               onTap: _confirmLeaveGroup,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.exit_to_app_rounded,
+                        color: Colors.red,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Leave Group',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'You won\'t receive messages anymore',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.red.withOpacity(0.5),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          // TODO: Add "Delete Group" action for creator
+          ),
         ],
       ),
     );
@@ -681,25 +636,23 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
             child: const Text('Cancel'),
             onPressed: () => Navigator.of(ctx).pop(),
           ),
-          ElevatedButton( // Use ElevatedButton for destructive action confirmation
-            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
             child: const Text('Leave', style: TextStyle(color: Colors.white)),
             onPressed: () async {
-              Navigator.of(ctx).pop(); // Close dialog
+              Navigator.of(ctx).pop();
               try {
-                // Show loading indicator?
                 await MessagingService.leaveGroupChat(widget.chatRoom.id);
                 if (mounted) {
-                  // Pop twice to go back past the chat room screen
                   int count = 0;
                   Navigator.of(context).popUntil((_) => count++ >= 2);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('You have left the group'),
-                      backgroundColor: Colors.green, // Use theme color?
+                      backgroundColor: Colors.green,
                       behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                      margin: EdgeInsets.all(12),
                     ),
                   );
                 }
@@ -710,14 +663,170 @@ class _ChatInfoPageState extends ConsumerState<ChatInfoPage> {
                       content: Text('Failed to leave group: $e'),
                       backgroundColor: Colors.red,
                       behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                      margin: EdgeInsets.all(12),
                     ),
                   );
                 }
               }
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// Custom Member Tile Widget
+class _MemberTile extends StatelessWidget {
+  final UserProfile member;
+  final bool isAdmin;
+  final bool isCurrentUser;
+  final bool canRemove;
+  final VoidCallback onRemove;
+
+  const _MemberTile({
+    required this.member,
+    required this.isAdmin,
+    required this.isCurrentUser,
+    required this.canRemove,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          // Avatar with Gradient Ring
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.3),
+                  AppTheme.secondaryColor.withOpacity(0.3),
+                ],
+              ),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.black.withOpacity(0.4)
+                    : Colors.white.withOpacity(0.4),
+              ),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: theme.colorScheme.surface.withOpacity(0.3),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          // User Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        member.displayName,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isCurrentUser) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'You',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  member.school,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          
+          // Admin Badge or Remove Button
+          if (isAdmin)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.amber.shade400,
+                    Colors.orange.shade400,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Admin',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (canRemove)
+            IconButton(
+              icon: Icon(
+                Icons.remove_circle_outline_rounded,
+                color: Colors.red.withOpacity(0.7),
+                size: 22,
+              ),
+              onPressed: onRemove,
+              tooltip: 'Remove member',
+            ),
         ],
       ),
     );

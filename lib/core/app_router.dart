@@ -38,7 +38,8 @@ class AppRouter {
       case '/journal':
         return _transition(const JournalPage());
       case '/meditation':
-        return _transition(const MeditationPage());
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _transition(MeditationPage(arguments: args));
       case '/chat':
         return _transition(const ChatPage());
       case '/groups':
