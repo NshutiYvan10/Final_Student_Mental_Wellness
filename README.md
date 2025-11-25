@@ -29,18 +29,21 @@ To create an accessible, stigma-free platform where students can prioritize thei
 
 <div align="center">
 
-<a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
-<img src="https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg" 
+<a href="https://www.youtube.com/watch?v=kZjOSHuk4O0">
+<img src="https://img.youtube.com/vi/kZjOSHuk4O0/maxresdefault.jpg" 
      alt="Student Mental Wellness Demo Video" 
-     width="600" 
-     style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+     width="100%" 
+     style="max-width: 800px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 </a>
 
-**▶️ Click to watch the full demo video**
+<br>
 
-*Complete app walkthrough showcasing AI features, messaging capabilities, and wellness tracking*
+### 🎬 **Watch the Full Demo on YouTube**
 
-</div>
+[![Watch Video](https://img.shields.io/badge/▶️_Watch_Full_Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=FF0000)](https://www.youtube.com/watch?v=kZjOSHuk4O0)
+[![YouTube](https://img.shields.io/badge/📱_App_Walkthrough-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=kZjOSHuk4O0)
+
+**Experience the complete feature tour with smooth animations**
 
 **Demo Highlights:**
 - 🚀 Smooth onboarding experience with mood selection
@@ -49,6 +52,8 @@ To create an accessible, stigma-free platform where students can prioritize thei
 - 💬 Seamless mentor connection and group messaging
 - 🧘 Interactive meditation sessions with progress tracking
 - 📈 Comprehensive analytics dashboard with beautiful visualizations
+
+</div>
 
 ---
 
