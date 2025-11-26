@@ -587,7 +587,7 @@ DEBUG_MODE=false
 
 <div align="center">
 
-[![Download APK](https://img.shields.io/badge/🤖_DOWNLOAD_APK-v1.0.0-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/NshutiYvan10/Final_Student_Mental_Wellness/releases/download/v1.0.0-initial/Student-Mental-Wellness)
+[![Download APK](https://img.shields.io/badge/🤖_DOWNLOAD_APK-v1.0.0-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/NshutiYvan10/Final_Student_Mental_Wellness/releases/download/v1.0.0-initial/Student-Mental-Wellness.apk)
 [![GitHub Release](https://img.shields.io/badge/📦_GitHub_Releases-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/NshutiYvan10/Final_Student_Mental_Wellness/releases)
 
 
@@ -597,7 +597,7 @@ DEBUG_MODE=false
 
 <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
 
-<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://github.com/NshutiYvan10/Final_Student_Mental_Wellness/releases/download/v1.0.0-initial/Student-Mental-Wellness&bgcolor=ffffff&color=6366f1&margin=10&qzone=2" 
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://github.com/NshutiYvan10/Final_Student_Mental_Wellness/releases/download/v1.0.0-initial/Student-Mental-Wellness.apk&bgcolor=ffffff&color=6366f1&margin=10&qzone=2" 
      alt="QR Code for Student Mental Wellness App" 
      width="150" 
      style="border-radius: 12px; border: 3px solid #6366f1; display: block; margin: 0 auto;">
