@@ -1421,6 +1421,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/chat_models.dart';
 import '../../models/user_profile.dart';
 import '../../services/messaging_service.dart';
@@ -1445,14 +1446,17 @@ class MessagingHubPage extends ConsumerStatefulWidget {
 }
 
 class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   UserProfile? _currentUser;
+  bool _isLoadingUser = true;
 
   final PageStorageKey _chatsKey = const PageStorageKey('chatsList');
   final PageStorageKey _mentorsKey = const PageStorageKey('mentorsList');
   final PageStorageKey _requestsKey = const PageStorageKey('requestsList');
 
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -1472,15 +1476,204 @@ class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
     if (mounted) {
       setState(() {
         _currentUser = user;
+        _isLoadingUser = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
     final msgTheme = context.messagingTheme;
     final isDark = theme.brightness == Brightness.dark;
+
+    // Show loading state while user profile is being fetched
+    if (_isLoadingUser) {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      theme.colorScheme.surface,
+                      theme.colorScheme.surface.withOpacity(0.95),
+                    ]
+                  : [
+                      theme.colorScheme.primary.withOpacity(0.03),
+                      theme.colorScheme.secondary.withOpacity(0.02),
+                      theme.scaffoldBackgroundColor,
+                    ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Animated pulsing container with gradient
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1500),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: 0.85 + (value * 0.15),
+                      child: Opacity(
+                        opacity: 0.4 + (value * 0.6),
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                theme.colorScheme.primary.withOpacity(0.25),
+                                theme.colorScheme.secondary.withOpacity(0.15),
+                              ],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withOpacity(0.2 * value),
+                                blurRadius: 40,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.secondary,
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.forum_rounded,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  onEnd: () {
+                    // Loop the animation
+                    if (mounted && _isLoadingUser) {
+                      setState(() {});
+                    }
+                  },
+                ),
+                const SizedBox(height: 32),
+                
+                // Animated text with fade
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.secondary,
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          'Loading Messages',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Preparing your conversations...',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Animated loading dots
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        final delay = index * 0.15;
+                        final dotValue = ((value + delay) % 1.0);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Transform.translate(
+                            offset: Offset(0, -8 * (1 - (dotValue * 2 - 1).abs())),
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.primary.withOpacity(0.3 + dotValue * 0.7),
+                                    theme.colorScheme.secondary.withOpacity(0.3 + dotValue * 0.7),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    );
+                  },
+                  onEnd: () {
+                    // Loop the animation
+                    if (mounted && _isLoadingUser) {
+                      setState(() {});
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final appBarForegroundColor = isDark ? Colors.white : theme.colorScheme.onSurface;
     final double topPadding = MediaQuery.of(context).padding.top;
@@ -1489,7 +1682,21 @@ class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
     final double extraSpacing = 12.0; // Extra spacing we added (8px header + 4px before tab bar)
     final double totalAppBarHeight = topPadding + appBarHeight + tabBarHeight + extraSpacing;
 
-    return Scaffold(
+    // Wrap the entire content in a smooth entry animation
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 30 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: Padding(
@@ -1707,11 +1914,12 @@ class _MessagingHubPageState extends ConsumerState<MessagingHubPage>
         child: TabBarView(
           controller: _tabController,
           children: [
-            _ChatsTab(),
-            _MentorsTab(),
-            _RequestsTab(),
+            _ChatsTab(key: _chatsKey),
+            _MentorsTab(key: _mentorsKey),
+            _RequestsTab(key: _requestsKey),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1916,7 +2124,7 @@ class _PremiumTabBar extends StatelessWidget implements PreferredSizeWidget {
 
 // --- _ChatsTab (Stunning Premium Design) ---
 class _ChatsTab extends StatefulWidget {
-  const _ChatsTab();
+  const _ChatsTab({super.key});
 
   @override
   State<_ChatsTab> createState() => _ChatsTabState();
@@ -1925,14 +2133,29 @@ class _ChatsTab extends StatefulWidget {
 class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
   String _filter = '';
+  late final Stream<List<ChatRoom>> _chatRoomsStream;
+  int _animationKey = 0;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    // Cache the stream to prevent re-subscription on rebuild
+    _chatRoomsStream = MessagingService.getUserChatRooms();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _triggerAnimation() {
+    setState(() {
+      _animationKey++;
+    });
   }
 
   @override
@@ -2052,12 +2275,12 @@ class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin
         ),
 
         // Quick Actions Bar
-        _QuickActionsBar(),
+        const _QuickActionsBar(),
 
         // Chat List
         Expanded(
           child: StreamBuilder<List<ChatRoom>>(
-            stream: MessagingService.getUserChatRooms(),
+            stream: _chatRoomsStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
@@ -2132,6 +2355,22 @@ class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin
                 return name.contains(_filter) || desc.contains(_filter);
               }).toList();
 
+              // Sort: pinned chats first, then by last message time
+              final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+              chatRooms.sort((a, b) {
+                final aPinned = currentUserId != null && a.pinnedBy.contains(currentUserId);
+                final bPinned = currentUserId != null && b.pinnedBy.contains(currentUserId);
+                
+                // Pinned chats come first
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                
+                // Within same pin status, sort by time
+                final aTime = a.lastMessageAt ?? a.createdAt;
+                final bTime = b.lastMessageAt ?? b.createdAt;
+                return bTime.compareTo(aTime);
+              });
+
               if (chatRooms.isEmpty) {
                 return const Center(
                   child: EmptyStateWidget(
@@ -2144,18 +2383,69 @@ class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin
               }
 
               return AnimationLimiter(
+                key: ValueKey('chat_animation_$_animationKey'),
                 child: ListView.builder(
+                  key: const PageStorageKey('chatsList'),
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   itemCount: chatRooms.length,
                   itemBuilder: (context, index) {
                     final chatRoom = chatRooms[index];
-                    return StaggeredListItem(
-                      index: index,
-                      duration: const Duration(milliseconds: 450),
-                      verticalOffset: 30.0,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ChatListItem(chatRoom: chatRoom),
+                    final isPinned = currentUserId != null && chatRoom.pinnedBy.contains(currentUserId);
+                    final isLastPinned = isPinned && 
+                        (index == chatRooms.length - 1 || 
+                         !(currentUserId != null && chatRooms[index + 1].pinnedBy.contains(currentUserId)));
+                    
+                    return AnimationConfiguration.staggeredList(
+                      position: index,
+                      duration: const Duration(milliseconds: 475),
+                      child: SlideAnimation(
+                        verticalOffset: 40.0,
+                        curve: Curves.easeOutCubic,
+                        child: FadeInAnimation(
+                          curve: Curves.easeOut,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ChatListItem(chatRoom: chatRoom),
+                              ),
+                              // Add divider after last pinned chat
+                              if (isLastPinned && index < chatRooms.length - 1)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Divider(
+                                          color: theme.colorScheme.onSurface.withOpacity(0.1),
+                                          thickness: 1,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        child: Text(
+                                          'All Chats',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Divider(
+                                          color: theme.colorScheme.onSurface.withOpacity(0.1),
+                                          thickness: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -2171,6 +2461,8 @@ class _ChatsTabState extends State<_ChatsTab> with AutomaticKeepAliveClientMixin
 
 // --- Quick Actions Bar Widget - FIXED to match search bar width ---
 class _QuickActionsBar extends StatelessWidget {
+  const _QuickActionsBar();
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -2336,15 +2628,33 @@ class _DiscoverGroupsButton extends StatelessWidget {
 
 
 // --- _MentorsTab (Stunning Premium Cards) ---
-class _MentorsTab extends StatelessWidget {
-  const _MentorsTab();
+class _MentorsTab extends StatefulWidget {
+  const _MentorsTab({super.key});
+
+  @override
+  State<_MentorsTab> createState() => _MentorsTabState();
+}
+
+class _MentorsTabState extends State<_MentorsTab> with AutomaticKeepAliveClientMixin {
+  late final Future<List<UserProfile>> _mentorsFuture;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache the future to prevent re-fetching on rebuild
+    _mentorsFuture = MessagingService.getMentors();
+  }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
 
     return FutureBuilder<List<UserProfile>>(
-      future: MessagingService.getMentors(),
+      future: _mentorsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -2430,15 +2740,21 @@ class _MentorsTab extends StatelessWidget {
             itemCount: mentors.length,
             itemBuilder: (context, index) {
               final mentor = mentors[index];
-              return StaggeredListItem(
-                index: index,
-                duration: const Duration(milliseconds: 450),
-                verticalOffset: 30.0,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _PremiumMentorCard(
-                    mentor: mentor,
-                    onChat: () => _sendChatRequest(context, mentor),
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 475),
+                child: SlideAnimation(
+                  verticalOffset: 40.0,
+                  curve: Curves.easeOutCubic,
+                  child: FadeInAnimation(
+                    curve: Curves.easeOut,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _PremiumMentorCard(
+                        mentor: mentor,
+                        onChat: () => _sendChatRequest(context, mentor),
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -2694,15 +3010,34 @@ class _PremiumMentorCard extends StatelessWidget {
 }
 
 // --- _RequestsTab (Premium Badge Design) ---
-class _RequestsTab extends ConsumerWidget {
-  const _RequestsTab();
+class _RequestsTab extends ConsumerStatefulWidget {
+  const _RequestsTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RequestsTab> createState() => _RequestsTabState();
+}
+
+class _RequestsTabState extends ConsumerState<_RequestsTab> with AutomaticKeepAliveClientMixin {
+  late final Stream<List<ChatRequest>> _requestsStream;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache the stream to prevent re-subscription on rebuild
+    _requestsStream = MessagingService.getChatRequests();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    final WidgetRef ref = this.ref;
     final theme = Theme.of(context);
 
     return StreamBuilder<List<ChatRequest>>(
-      stream: MessagingService.getChatRequests(),
+      stream: _requestsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -2911,13 +3246,19 @@ class _RequestsTab extends ConsumerWidget {
                   itemCount: requests.length,
                   itemBuilder: (context, index) {
                     final request = requests[index];
-                    return StaggeredListItem(
-                      index: index,
-                      duration: const Duration(milliseconds: 450),
-                      verticalOffset: 30.0,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: RequestTile(request: request),
+                    return AnimationConfiguration.staggeredList(
+                      position: index,
+                      duration: const Duration(milliseconds: 475),
+                      child: SlideAnimation(
+                        verticalOffset: 40.0,
+                        curve: Curves.easeOutCubic,
+                        child: FadeInAnimation(
+                          curve: Curves.easeOut,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: RequestTile(request: request),
+                          ),
+                        ),
                       ),
                     );
                   },

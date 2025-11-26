@@ -46,8 +46,9 @@ class MessagingService {
               .map((doc) => ChatRoom.fromMap({...doc.data(), 'id': doc.id}))
               .toList();
           rooms.sort((a, b) {
-            final aTime = a.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bTime = b.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            // Use lastMessageAt if available, otherwise use createdAt for new chats
+            final aTime = a.lastMessageAt ?? a.createdAt;
+            final bTime = b.lastMessageAt ?? b.createdAt;
             return bTime.compareTo(aTime);
           });
           return rooms;
@@ -114,13 +115,16 @@ class MessagingService {
       throw Exception('Only mentors can create support groups');
     }
 
+    // Ensure the creator is in the members list and remove duplicates
+    final uniqueMemberIds = {...memberIds, user.uid}.toList();
+
     final chatRoom = ChatRoom(
       id: _uuid.v4(),
       name: name,
       description: description,
       imageUrl: imageUrl,
       type: ChatType.group,
-      memberIds: [user.uid, ...memberIds],
+      memberIds: uniqueMemberIds,
       createdBy: user.uid,
       createdAt: DateTime.now(),
       isPrivate: isPrivate,
@@ -144,8 +148,10 @@ class MessagingService {
       throw Exception('User not authenticated');
     }
 
+    print('Checking for existing chat between ${user.uid} and $targetUserId');
+    
     // Check if private chat already exists
-  final existingChats = await __db
+    final existingChats = await __db
         .collection('chat_rooms')
         .where('type', isEqualTo: ChatType.private.name)
         .where('memberIds', arrayContains: user.uid)
@@ -154,24 +160,32 @@ class MessagingService {
     for (final doc in existingChats.docs) {
       final chat = ChatRoom.fromMap({...doc.data(), 'id': doc.id});
       if (chat.memberIds.contains(targetUserId) && chat.memberIds.length == 2) {
+        print('Found existing chat: ${chat.id}');
         return chat;
       }
     }
 
     // Create new private chat
+    final chatId = _uuid.v4();
+    print('Creating new private chat with ID: $chatId');
+    
     final chatRoom = ChatRoom(
-      id: _uuid.v4(),
+      id: chatId,
       name: '', // Will be set based on participants
       type: ChatType.private,
       memberIds: [user.uid, targetUserId],
       createdAt: DateTime.now(),
     );
 
-  await __db
+    final chatData = chatRoom.toMap();
+    chatData['id'] = chatId; // Ensure ID is in the document
+    
+    await __db
         .collection('chat_rooms')
-        .doc(chatRoom.id)
-        .set(chatRoom.toMap());
-
+        .doc(chatId)
+        .set(chatData);
+    
+    print('Chat room document created successfully');
     return chatRoom;
   }
 
@@ -203,22 +217,128 @@ class MessagingService {
     });
   }
 
+  static Future<void> deleteChat(String chatRoomId) async {
+    if (!FirebaseService.isInitialized) return;
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final chatDoc = await __db.collection('chat_rooms').doc(chatRoomId).get();
+      if (!chatDoc.exists) return;
+
+      final chat = ChatRoom.fromMap({...chatDoc.data()!, 'id': chatDoc.id});
+
+      // For private chats, remove the user from memberIds
+      // If it becomes empty, delete the entire chat room
+      if (chat.type == ChatType.private) {
+        final updatedMembers = chat.memberIds.where((id) => id != user.uid).toList();
+        
+        if (updatedMembers.isEmpty) {
+          // Delete all messages in the chat
+          final messagesSnapshot = await __db
+              .collection('chat_rooms')
+              .doc(chatRoomId)
+              .collection('messages')
+              .get();
+          
+          for (final messageDoc in messagesSnapshot.docs) {
+            await messageDoc.reference.delete();
+          }
+          
+          // Delete the chat room itself
+          await __db.collection('chat_rooms').doc(chatRoomId).delete();
+        } else {
+          // Just remove the current user from members
+          await __db.collection('chat_rooms').doc(chatRoomId).update({
+            'memberIds': updatedMembers,
+          });
+        }
+      } else {
+        // For group chats, just remove the user (same as leaving)
+        await leaveGroupChat(chatRoomId);
+      }
+    } catch (e) {
+      print('Error deleting chat: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> pinChat(String chatRoomId, bool isPinned) async {
+    if (!FirebaseService.isInitialized) return;
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await __db.collection('chat_rooms').doc(chatRoomId).set({
+        'pinnedBy': isPinned 
+            ? FieldValue.arrayUnion([user.uid])
+            : FieldValue.arrayRemove([user.uid]),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error pinning chat: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> muteChat(String chatRoomId, bool isMuted) async {
+    if (!FirebaseService.isInitialized) return;
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await __db.collection('chat_rooms').doc(chatRoomId).set({
+        'mutedBy': isMuted 
+            ? FieldValue.arrayUnion([user.uid])
+            : FieldValue.arrayRemove([user.uid]),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error muting chat: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> archiveChat(String chatRoomId, bool isArchived) async {
+    if (!FirebaseService.isInitialized) return;
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await __db.collection('chat_rooms').doc(chatRoomId).set({
+        'archivedBy': isArchived 
+            ? FieldValue.arrayUnion([user.uid])
+            : FieldValue.arrayRemove([user.uid]),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error archiving chat: $e');
+      rethrow;
+    }
+  }
+
   // Messages
   static Stream<List<ChatMessage>> getChatMessages(String chatRoomId, {int limit = 50}) {
     if (!FirebaseService.isInitialized) {
       return const Stream.empty();
     }
 
-      return __db
+    print('Setting up message stream for chat room: $chatRoomId');
+
+    return __db
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatMessage.fromMap({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map((snapshot) {
+          print('Received ${snapshot.docs.length} messages for chat room: $chatRoomId');
+          return snapshot.docs
+              .map((doc) => ChatMessage.fromMap({...doc.data(), 'id': doc.id}))
+              .toList();
+        });
   }
 
   static Future<List<ChatMessage>> fetchOlderMessages({
@@ -228,16 +348,33 @@ class MessagingService {
   }) async {
     if (!FirebaseService.isInitialized) return [];
 
-      final snap = await __db
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .orderBy('createdAt', descending: true)
-        .startAfter([before.toIso8601String()])
-        .limit(limit)
-        .get();
+      QuerySnapshot snap;
+      try {
+        // Prefer Timestamp cursor (new messages use server timestamps)
+        snap = await __db
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('createdAt', descending: true)
+          .startAfter([Timestamp.fromDate(before)])
+          .limit(limit)
+          .get();
+      } catch (e) {
+        // Fallback to ISO string cursor for older messages that might be stored as strings
+        snap = await __db
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('createdAt', descending: true)
+          .startAfter([before.toIso8601String()])
+          .limit(limit)
+          .get();
+      }
     return snap.docs
-        .map((doc) => ChatMessage.fromMap({...doc.data(), 'id': doc.id}))
+        .map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return ChatMessage.fromMap({...data, 'id': doc.id});
+        })
         .toList();
   }
 
@@ -247,14 +384,23 @@ class MessagingService {
     MessageType type = MessageType.text,
     String? replyToMessageId,
   }) async {
-    if (!FirebaseService.isInitialized) return;
+    if (!FirebaseService.isInitialized) {
+      print('ERROR: Firebase not initialized');
+      return;
+    }
 
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('ERROR: No authenticated user');
+      return;
+    }
 
     // Get user profile for sender info
     final userProfile = await AuthService.getCurrentUserProfile();
-    if (userProfile == null) return;
+    if (userProfile == null) {
+      print('ERROR: Could not get user profile');
+      return;
+    }
 
     final message = ChatMessage(
       id: _uuid.v4(),
@@ -268,21 +414,54 @@ class MessagingService {
       replyToMessageId: replyToMessageId,
     );
 
-    // Add message to chat room
+    try {
+      print('Sending message to chat room: $chatRoomId');
+      print('Sender: ${user.uid} (${userProfile.displayName})');
+      print('Content: $content');
+      
+      // Verify chat room exists and user is a member
+      final chatRoomDoc = await __db.collection('chat_rooms').doc(chatRoomId).get();
+      if (!chatRoomDoc.exists) {
+        print('ERROR: Chat room does not exist!');
+        throw Exception('Chat room not found');
+      }
+      
+      final chatRoomData = chatRoomDoc.data()!;
+      final memberIds = List<String>.from(chatRoomData['memberIds'] ?? []);
+      print('Chat room members: $memberIds');
+      
+      if (!memberIds.contains(user.uid)) {
+        print('ERROR: Current user is not a member of this chat room!');
+        throw Exception('User is not a member of this chat room');
+      }
+      
+      // Add message to chat room using server timestamp for createdAt
+      final messageMap = Map<String, dynamic>.from(message.toMap());
+      // Replace createdAt with server timestamp so all clients receive consistent timestamp types
+      messageMap['createdAt'] = FieldValue.serverTimestamp();
+
       await __db
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
         .doc(message.id)
-        .set(message.toMap());
+        .set(messageMap);
 
-    // Update last message timestamp
+      print('Message written to Firestore: ${message.id}');
+
+      // Update last message timestamp using server timestamp for consistency
       await __db
         .collection('chat_rooms')
         .doc(chatRoomId)
         .update({
-      'lastMessageAt': DateTime.now().toIso8601String(),
-    });
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Updated lastMessageAt for chat room: $chatRoomId');
+    } catch (e) {
+      print('ERROR sending message: $e');
+      rethrow;
+    }
   }
 
   // Read state and unread count
@@ -310,12 +489,25 @@ class MessagingService {
       final lastReadAtStr = (readSnap.data() ?? {})['lastReadAt'] as String?;
       final lastReadAt = lastReadAtStr != null ? DateTime.parse(lastReadAtStr) : DateTime.fromMillisecondsSinceEpoch(0);
 
-      final newer = await roomRef
-          .collection('messages')
-          .where('createdAt', isGreaterThan: lastReadAt.toIso8601String())
-          .get();
+      QuerySnapshot newerSnapshot;
+      try {
+        newerSnapshot = await roomRef
+            .collection('messages')
+            .where('createdAt', isGreaterThan: Timestamp.fromDate(lastReadAt))
+            .get();
+      } catch (e) {
+        // Fallback to string comparison for older stored messages
+        newerSnapshot = await roomRef
+            .collection('messages')
+            .where('createdAt', isGreaterThan: lastReadAt.toIso8601String())
+            .get();
+      }
+      final newer = newerSnapshot;
       // Exclude user's own messages
-      final count = newer.docs.where((d) => (d.data()['senderId'] as String?) != user.uid).length;
+      final count = newer.docs.where((d) {
+        final data = d.data() as Map<String, dynamic>;
+        return (data['senderId'] as String?) != user.uid;
+      }).length;
       return count;
     });
   }
@@ -325,12 +517,17 @@ class MessagingService {
     if (!FirebaseService.isInitialized) return;
     final user = _auth.currentUser;
     if (user == null) return;
-    await __db
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('typing')
-        .doc(user.uid)
-        .set({'isTyping': isTyping, 'updatedAt': DateTime.now().toIso8601String()}, SetOptions(merge: true));
+    try {
+      await __db
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .collection('typing')
+          .doc(user.uid)
+          .set({'isTyping': isTyping, 'updatedAt': DateTime.now().toIso8601String()}, SetOptions(merge: true));
+    } catch (e) {
+      // Ignore permission errors for typing indicators (e.g., user not yet a member of public group)
+      print('setTyping: could not write typing state (ignored): $e');
+    }
   }
 
   static Stream<List<String>> typingUsers(String chatRoomId) {
@@ -541,26 +738,74 @@ class MessagingService {
   }) async {
     if (!FirebaseService.isInitialized) return;
 
+    try {
       await __db
-        .collection('chat_requests')
-        .doc(requestId)
-        .update({
-      'status': status.name,
-      'respondedAt': DateTime.now().toIso8601String(),
-      'responseMessage': responseMessage,
-    });
-
-    // If approved, create private chat
-    if (status == ChatRequestStatus.approved) {
-      final requestDoc = await _db
           .collection('chat_requests')
           .doc(requestId)
-          .get();
+          .update({
+        'status': status.name,
+        'respondedAt': DateTime.now().toIso8601String(),
+        'responseMessage': responseMessage,
+      });
 
-      if (requestDoc.exists) {
-        final request = ChatRequest.fromMap({...requestDoc.data()!, 'id': requestId});
-        await createPrivateChat(request.requesterId);
+      // If approved, create private chat and send welcome message
+      if (status == ChatRequestStatus.approved) {
+        final requestDoc = await __db
+            .collection('chat_requests')
+            .doc(requestId)
+            .get();
+
+        if (requestDoc.exists) {
+          final request = ChatRequest.fromMap({...requestDoc.data()!, 'id': requestId});
+          
+          print('Creating private chat for requester: ${request.requesterId}');
+          final chatRoom = await createPrivateChat(request.requesterId);
+          print('Chat room created with ID: ${chatRoom.id}');
+          
+          // Send a welcome message to make the chat visible immediately
+          final user = __auth.currentUser;
+          if (user != null) {
+            final userProfile = await AuthService.getCurrentUserProfile();
+            final welcomeMessage = ChatMessage(
+              id: _uuid.v4(),
+              chatRoomId: chatRoom.id,
+              senderId: user.uid,
+              senderName: userProfile?.displayName ?? 'User',
+              content: responseMessage?.isNotEmpty == true 
+                  ? responseMessage! 
+                  : 'Chat request accepted! Feel free to start the conversation.',
+              type: MessageType.text,
+              createdAt: DateTime.now(),
+            );
+
+            print('Sending welcome message to chat: ${chatRoom.id}');
+
+            final welcomeMap = Map<String, dynamic>.from(welcomeMessage.toMap());
+            welcomeMap['createdAt'] = FieldValue.serverTimestamp();
+
+            await __db
+                .collection('chat_rooms')
+                .doc(chatRoom.id)
+                .collection('messages')
+                .doc(welcomeMessage.id)
+                .set(welcomeMap);
+
+            // Update lastMessageAt so the chat appears at the top (use server timestamp)
+            print('Updating lastMessageAt for chat: ${chatRoom.id}');
+            await __db
+                .collection('chat_rooms')
+                .doc(chatRoom.id)
+                .update({
+              'lastMessageAt': FieldValue.serverTimestamp(),
+            });
+            
+            print('Chat setup complete for: ${chatRoom.id}');
+          }
+        }
       }
+    } catch (e) {
+      print('Error responding to chat request: $e');
+      rethrow;
     }
   }
 
@@ -592,13 +837,41 @@ class MessagingService {
     }
   }
 
+  /// Get the other user's profile in a private chat
+  static Future<UserProfile?> getOtherUserInPrivateChat(ChatRoom chatRoom) async {
+    if (!FirebaseService.isInitialized) return null;
+    if (chatRoom.type != ChatType.private) return null;
+    if (chatRoom.memberIds.length != 2) return null;
+
+    final currentUser = __auth.currentUser;
+    if (currentUser == null) return null;
+
+    // Find the other user's ID
+    final otherUserId = chatRoom.memberIds.firstWhere(
+      (id) => id != currentUser.uid,
+      orElse: () => '',
+    );
+
+    if (otherUserId.isEmpty) return null;
+
+    try {
+      final userDoc = await __db.collection('users').doc(otherUserId).get();
+      if (!userDoc.exists) return null;
+      return UserProfile.fromMap(userDoc.data()!);
+    } catch (e) {
+      print('Error fetching other user profile: $e');
+      return null;
+    }
+  }
+
   static Future<List<UserProfile>> getMentors() async {
     if (!FirebaseService.isInitialized) {
       return [];
     }
 
     try {
-        final snapshot = await __db
+      final currentUser = __auth.currentUser;
+      final snapshot = await __db
           .collection('users')
           .where('role', isEqualTo: UserRole.mentor.name)
           .limit(50)
@@ -606,6 +879,7 @@ class MessagingService {
 
       return snapshot.docs
           .map((doc) => UserProfile.fromMap(doc.data()))
+          .where((mentor) => mentor.uid != currentUser?.uid) // Exclude current user
           .toList();
     } catch (_) {
       return [];
@@ -617,12 +891,14 @@ class MessagingService {
     if (!FirebaseService.isInitialized) {
       return Stream.value([]);
     }
-      return __db
+    final currentUser = __auth.currentUser;
+    return __db
         .collection('users')
         .where('role', isEqualTo: UserRole.mentor.name)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => UserProfile.fromMap(doc.data()))
+            .where((mentor) => mentor.uid != currentUser?.uid) // Exclude current user
             .toList());
   }
 
@@ -703,5 +979,58 @@ class MessagingService {
     };
 
       await __db.collection('private_chat_requests').doc(request['id']).set(request);
+  }
+
+  // Helper: Get existing private chat between current user and target
+  static Future<ChatRoom?> getExistingPrivateChat(String targetUserId) async {
+    if (!_isReady) return null;
+
+    final user = __auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final existingChats = await __db
+          .collection('chat_rooms')
+          .where('type', isEqualTo: ChatType.private.name)
+          .where('memberIds', arrayContains: user.uid)
+          .get();
+
+      for (final doc in existingChats.docs) {
+        final chat = ChatRoom.fromMap({...doc.data(), 'id': doc.id});
+        if (chat.memberIds.contains(targetUserId) && chat.memberIds.length == 2) {
+          return chat;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error checking for existing chat: $e');
+      return null;
+    }
+  }
+
+  // Helper: Get existing chat request from current user to target
+  static Future<ChatRequest?> getExistingChatRequest(String targetUserId) async {
+    if (!_isReady) return null;
+
+    final user = __auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final snapshot = await __db
+          .collection('chat_requests')
+          .where('requesterId', isEqualTo: user.uid)
+          .where('targetUserId', isEqualTo: targetUserId)
+          .where('status', isEqualTo: ChatRequestStatus.pending.name)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return ChatRequest.fromMap({...snapshot.docs.first.data(), 'id': snapshot.docs.first.id});
+      }
+      return null;
+    } catch (e) {
+      print('Error checking for existing request: $e');
+      return null;
+    }
   }
 }

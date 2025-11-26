@@ -107,7 +107,7 @@ class UserProfile {
         uid: map['uid'] as String,
         displayName: map['displayName'] as String,
         email: map['email'] as String,
-        avatarUrl: map['avatarUrl'] as String,
+        avatarUrl: (map['avatarUrl'] as String?) ?? '',
         school: map['school'] as String,
         role: UserRole.values.firstWhere(
           (e) => e.name == map['role'],

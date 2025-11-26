@@ -155,41 +155,17 @@ class ChatListItem extends StatelessWidget {
                   // Premium Avatar with gradient border
                   Hero(
                     tag: heroTag,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.secondary,
-                          ],
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? theme.colorScheme.surface
-                              : Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          chatRoom.type == ChatType.group
-                              ? Icons.group_rounded
-                              : Icons.person_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 24,
-                        ),
-                      ),
-                    ),
+                    child: chatRoom.type == ChatType.private
+                        ? FutureBuilder<UserProfile?>(
+                            future: MessagingService.getOtherUserInPrivateChat(chatRoom),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data != null) {
+                                return _buildUserAvatar(snapshot.data!, theme, isDark);
+                              }
+                              return _buildDefaultAvatar(theme, isDark, Icons.person_rounded);
+                            },
+                          )
+                        : _buildDefaultAvatar(theme, isDark, Icons.group_rounded),
                   ),
                   const SizedBox(width: 14),
                   // Title & Subtitle
@@ -197,20 +173,40 @@ class ChatListItem extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                          Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                chatRoom.name.isEmpty ? 'Private Chat' : chatRoom.name,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: theme.colorScheme.onSurface,
-                                  fontSize: 16,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: chatRoom.type == ChatType.private
+                                  ? FutureBuilder<UserProfile?>(
+                                      future: MessagingService.getOtherUserInPrivateChat(chatRoom),
+                                      builder: (context, snapshot) {
+                                        final displayName = snapshot.hasData && snapshot.data != null
+                                            ? snapshot.data!.displayName
+                                            : 'Private Chat';
+                                        return Text(
+                                          displayName,
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: theme.colorScheme.onSurface,
+                                            fontSize: 16,
+                                            letterSpacing: -0.2,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                      },
+                                    )
+                                  : Text(
+                                      chatRoom.name.isEmpty ? 'Group Chat' : chatRoom.name,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: theme.colorScheme.onSurface,
+                                        fontSize: 16,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                             ),
                           ],
                         ),
@@ -328,5 +324,160 @@ class ChatListItem extends StatelessWidget {
     } else {
       return DateFormat('dd/MM/yy').format(timestamp); // e.g., 27/10/25
     }
+  }
+
+  // Helper to build user avatar with gradient border
+  Widget _buildUserAvatar(UserProfile user, ThemeData theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.secondary,
+          ],
+        ),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDark ? theme.colorScheme.surface : Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: ClipOval(
+          child: _buildAvatarContent(user, theme),
+        ),
+      ),
+    );
+  }
+
+  // Helper to build avatar content (image or gradient)
+  Widget _buildAvatarContent(UserProfile user, ThemeData theme) {
+    print('🎨 Building avatar for ${user.displayName}, avatarUrl: "${user.avatarUrl}"');
+    if (user.avatarUrl.isNotEmpty) {
+      if (user.avatarUrl.startsWith('gradient_')) {
+        print('✅ Using gradient avatar: ${user.avatarUrl}');
+        return _buildGradientAvatar(user.avatarUrl, theme);
+      } else if (user.avatarUrl.startsWith('assets/')) {
+        print('✅ Using asset avatar: ${user.avatarUrl}');
+        return Image.asset(
+          user.avatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildDefaultAvatarIcon(theme, Icons.person_rounded),
+        );
+      } else {
+        print('✅ Using network avatar: ${user.avatarUrl}');
+        return Image.network(
+          user.avatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildDefaultAvatarIcon(theme, Icons.person_rounded),
+        );
+      }
+    }
+    print('⚠️ Empty avatarUrl, using default');
+    return _buildDefaultAvatarIcon(theme, Icons.person_rounded);
+  }
+
+  // Helper to build gradient avatar
+  Widget _buildGradientAvatar(String avatarId, ThemeData theme) {
+    final avatarData = {
+      'gradient_1': {'icon': Icons.person_rounded, 'colors': [Color(0xFF6366F1), Color(0xFF8B5CF6)]},
+      'gradient_2': {'icon': Icons.face_rounded, 'colors': [Color(0xFFEC4899), Color(0xFFF472B6)]},
+      'gradient_3': {'icon': Icons.emoji_emotions_rounded, 'colors': [Color(0xFF10B981), Color(0xFF34D399)]},
+      'gradient_4': {'icon': Icons.sentiment_very_satisfied_rounded, 'colors': [Color(0xFFF59E0B), Color(0xFFFBBF24)]},
+      'gradient_5': {'icon': Icons.star_rounded, 'colors': [Color(0xFF3B82F6), Color(0xFF60A5FA)]},
+      'gradient_6': {'icon': Icons.favorite_rounded, 'colors': [Color(0xFFEF4444), Color(0xFFF87171)]},
+      'gradient_7': {'icon': Icons.psychology_rounded, 'colors': [Color(0xFF8B5CF6), Color(0xFFA78BFA)]},
+      'gradient_8': {'icon': Icons.wb_sunny_rounded, 'colors': [Color(0xFFF59E0B), Color(0xFFEF4444)]},
+      'gradient_9': {'icon': Icons.auto_awesome_rounded, 'colors': [Color(0xFF06B6D4), Color(0xFF3B82F6)]},
+      'gradient_10': {'icon': Icons.spa_rounded, 'colors': [Color(0xFF10B981), Color(0xFF06B6D4)]},
+      'gradient_11': {'icon': Icons.diamond_rounded, 'colors': [Color(0xFFEC4899), Color(0xFF8B5CF6)]},
+      'gradient_12': {'icon': Icons.palette_rounded, 'colors': [Color(0xFFF59E0B), Color(0xFF10B981)]},
+    };
+
+    final data = avatarData[avatarId];
+    if (data == null) {
+      return _buildDefaultAvatarIcon(theme, Icons.person_rounded);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: data['colors'] as List<Color>,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Icon(
+        data['icon'] as IconData,
+        size: 22,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  // Helper to build default avatar with icon
+  Widget _buildDefaultAvatar(ThemeData theme, bool isDark, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.secondary,
+          ],
+        ),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? theme.colorScheme.surface : Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: theme.colorScheme.primary,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  // Helper to build default avatar icon content
+  Widget _buildDefaultAvatarIcon(ThemeData theme, IconData icon) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.3),
+            theme.colorScheme.secondary.withOpacity(0.2),
+          ],
+        ),
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: theme.colorScheme.primary,
+      ),
+    );
   }
 }

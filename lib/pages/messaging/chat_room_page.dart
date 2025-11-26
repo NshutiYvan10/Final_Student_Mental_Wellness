@@ -444,17 +444,26 @@ import '../../widgets/messaging/message_bubble.dart';
 import '../../widgets/messaging/chat_input_bar.dart';
 import '../../widgets/messaging/empty_state_widget.dart'; // Import EmptyStateWidget
 import '../../widgets/animations/staggered_list_item.dart';
+import '../../widgets/user_avatar.dart';
 import 'chat_info_page.dart';
 
 class ChatRoomPage extends ConsumerStatefulWidget {
-  final ChatRoom chatRoom;
-  final String? heroTag; // Made nullable
+  final ChatRoom? chatRoom;
+  final UserProfile? targetUser; // For draft mode
+  final String? heroTag;
 
   const ChatRoomPage({
     super.key,
     required this.chatRoom,
-    this.heroTag, // Removed required
-  });
+    this.heroTag,
+  }) : targetUser = null;
+
+  // Draft constructor - chat room will be created on first message
+  const ChatRoomPage.draft({
+    super.key,
+    required this.targetUser,
+    this.heroTag,
+  }) : chatRoom = null;
 
   @override
   ConsumerState<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -465,16 +474,20 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocusNode = FocusNode();
   UserProfile? _currentUser;
+  bool _isLoadingUser = true;
+  ChatRoom? _actualChatRoom; // Will be set after first message in draft mode
 
   List<ChatMessage> _olderMessages = [];
   bool _isLoadingMore = false;
   bool _canLoadMore = true;
   bool _initialLoadComplete = false;
-  double _lastMaxScrollExtent = 0.0; // To track scroll position during older load
+  double _lastMaxScrollExtent = 0.0;
 
   // Animation controllers for bubble background
   late AnimationController _floatController;
 
+  bool get _isDraftMode => widget.chatRoom == null && widget.targetUser != null;
+  ChatRoom? get _chatRoom => _actualChatRoom ?? widget.chatRoom;
 
   @override
   void initState() {
@@ -488,7 +501,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
     
     _loadCurrentUser();
     _scrollController.addListener(_onScroll);
-    MessagingService.markRoomRead(widget.chatRoom.id);
+    
+    // Only mark as read if we have an actual chat room
+    if (_chatRoom != null) {
+      MessagingService.markRoomRead(_chatRoom!.id);
+    }
+    
     // Jump to bottom initially AFTER the first frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -504,13 +522,20 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _inputFocusNode.dispose();
-    MessagingService.setTyping(chatRoomId: widget.chatRoom.id, isTyping: false);
+    
+    // Only set typing to false if we have a chat room
+    if (_chatRoom != null) {
+      MessagingService.setTyping(chatRoomId: _chatRoom!.id, isTyping: false);
+    }
     super.dispose();
   }
 
   Future<void> _loadCurrentUser() async {
     final user = await AuthService.getCurrentUserProfile();
-    if (mounted) setState(() => _currentUser = user);
+    if (mounted) setState(() {
+      _currentUser = user;
+      _isLoadingUser = false;
+    });
   }
 
   void _onScroll() {
@@ -525,13 +550,13 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
   }
 
   Future<void> _loadOlderMessages() async {
-    if (!_canLoadMore || _isLoadingMore) return;
+    if (!_canLoadMore || _isLoadingMore || _chatRoom == null) return;
     print("Loading older messages...");
     setState(() => _isLoadingMore = true);
 
     final oldestVisibleMessage = _olderMessages.isNotEmpty
         ? _olderMessages.last
-        : (await MessagingService.getChatMessages(widget.chatRoom.id, limit: 50).first).lastOrNull;
+        : (await MessagingService.getChatMessages(_chatRoom!.id, limit: 50).first).lastOrNull;
 
 
     if (oldestVisibleMessage == null) {
@@ -545,7 +570,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
 
     try {
       final older = await MessagingService.fetchOlderMessages(
-        chatRoomId: widget.chatRoom.id,
+        chatRoomId: _chatRoom!.id,
         before: oldestTimestamp,
         limit: 30,
       );
@@ -591,23 +616,62 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
   }
 
 
-  void _sendMessage() {
+  void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _currentUser == null) return;
-    MessagingService.sendMessage(
-        chatRoomId: widget.chatRoom.id, content: text);
+
+    // Clear input immediately for better UX
     _messageController.clear();
-    MessagingService.setTyping(chatRoomId: widget.chatRoom.id, isTyping: false);
-    _inputFocusNode.unfocus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && _scrollController.position.pixels > 0) {
-        _scrollController.animateTo(0.0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutQuad);
-      } else if (_scrollController.hasClients) {
-        _scrollController.jumpTo(0.0);
+
+    try {
+      // If in draft mode, create the chat room first
+      if (_isDraftMode && _actualChatRoom == null) {
+        final newChatRoom = await MessagingService.createPrivateChat(widget.targetUser!.uid);
+        if (mounted) {
+          setState(() {
+            _actualChatRoom = newChatRoom;
+          });
+        }
+        // Mark the newly created room as read
+        MessagingService.markRoomRead(newChatRoom.id);
       }
-    });
+
+      // Send the message
+      if (_chatRoom != null) {
+        await MessagingService.sendMessage(
+          chatRoomId: _chatRoom!.id,
+          content: text,
+        );
+        
+        if (mounted) {
+          MessagingService.setTyping(chatRoomId: _chatRoom!.id, isTyping: false);
+          _inputFocusNode.unfocus();
+          
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients && _scrollController.position.pixels > 0) {
+              _scrollController.animateTo(0.0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutQuad);
+            } else if (_scrollController.hasClients) {
+              _scrollController.jumpTo(0.0);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+      // Restore the text if sending failed
+      if (mounted) {
+        _messageController.text = text;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _sendAttachment() {
@@ -841,14 +905,58 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
             GestureDetector(
               onTap: () {
                 _inputFocusNode.unfocus();
-                MessagingService.setTyping(
-                    chatRoomId: widget.chatRoom.id, isTyping: false);
+                if (_chatRoom != null) {
+                  MessagingService.setTyping(
+                      chatRoomId: _chatRoom!.id, isTyping: false);
+                }
               },
               child: Column(
               children: [
                 Expanded(
-                  child: StreamBuilder<List<ChatMessage>>(
-                    stream: MessagingService.getChatMessages(widget.chatRoom.id, limit: 50),
+                  child: _isLoadingUser
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.primary.withOpacity(0.2),
+                                    theme.colorScheme.secondary.withOpacity(0.1),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: theme.colorScheme.primary,
+                                  strokeWidth: 3,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Loading chat...',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _chatRoom == null
+                      // Draft mode - no chat room created yet
+                      ? const EmptyStateWidget(
+                          icon: Icons.forum_rounded,
+                          title: 'Start the Conversation!',
+                          message: 'Send the first message to create this chat.',
+                        )
+                      // Normal mode - show messages stream
+                      : StreamBuilder<List<ChatMessage>>(
+                    stream: MessagingService.getChatMessages(_chatRoom!.id, limit: 50),
                     builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting && _olderMessages.isEmpty && !_initialLoadComplete) {
                     return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
@@ -858,7 +966,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
                   }
 
                   List<ChatMessage> currentMessages = snapshot.data ?? [];
-                  List<ChatMessage> allMessages = [..._olderMessages.reversed, ...currentMessages];
+                  // Both currentMessages and _olderMessages are in descending order (newest first)
+                  // Combine: currentMessages (newest recent) + _olderMessages (older messages)
+                  List<ChatMessage> allMessages = [...currentMessages, ..._olderMessages];
 
                   if (allMessages.isEmpty && snapshot.connectionState != ConnectionState.waiting) {
                     // *** FIX: Removed style parameters ***
@@ -903,6 +1013,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
                         if (index >= allMessages.length) return const SizedBox.shrink();
 
                         final message = allMessages[index];
+                        // Show sender name/tail when sender changes
+                        // List is descending (newest first), reversed ListView shows newest at bottom
+                        // Check if previous message in list (index-1) is from different sender
                         final bool showTail = index == 0 || allMessages[index - 1].senderId != message.senderId;
                         final double bottomPadding = showTail && index != 0 ? 8.0 : 0.0;
 
@@ -913,7 +1026,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
                             duration: const Duration(milliseconds: 300),
                             verticalOffset: 20.0,
                             child: MessageBubble(
-                              chatRoom: widget.chatRoom,
+                              chatRoom: _chatRoom!,
                               message: message,
                               isMe: message.senderId == _currentUser?.uid,
                               showTail: showTail,
@@ -933,10 +1046,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
               onSendPressed: _sendMessage,
               onAttachmentPressed: _sendAttachment,
               onTextChanged: (text) {
-                MessagingService.setTyping(
-                  chatRoomId: widget.chatRoom.id,
-                  isTyping: text.isNotEmpty,
-                );
+                if (_chatRoom != null) {
+                  MessagingService.setTyping(
+                    chatRoomId: _chatRoom!.id,
+                    isTyping: text.isNotEmpty,
+                  );
+                }
               },
             ),
           ],
@@ -951,14 +1066,62 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
   Widget _buildPremiumAppBarTitle(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final String effectiveHeroTag = widget.heroTag ?? 'avatar-${widget.chatRoom.id}';
+    
+    // In draft mode, use target user info
+    if (_isDraftMode && widget.targetUser != null) {
+      return GestureDetector(
+        onTap: () {
+          // Don't navigate to chat info in draft mode
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            UserAvatar(
+              user: widget.targetUser,
+              size: 44,
+              showGradientBorder: true,
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    widget.targetUser!.displayName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'New Chat',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Normal mode with existing chat room
+    if (_chatRoom == null) return const SizedBox();
+    
+    final String effectiveHeroTag = widget.heroTag ?? 'avatar-${_chatRoom!.id}';
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ChatInfoPage(chatRoom: widget.chatRoom),
+            builder: (context) => ChatInfoPage(chatRoom: _chatRoom!),
           ),
         );
       },
@@ -973,33 +1136,44 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
               child: toHeroContext.widget,
             );
           },
-          child: Container(
-            width: 44,
-            height: 44,
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary.withOpacity(0.2),
-                  theme.colorScheme.secondary.withOpacity(0.2),
-                ],
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.08) : theme.colorScheme.surface,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(
-                  widget.chatRoom.type == ChatType.group ? Icons.group_rounded : Icons.person_rounded,
-                  size: 20,
-                  color: theme.colorScheme.primary,
+          child: _chatRoom!.type == ChatType.group
+              ? Container(
+                  width: 44,
+                  height: 44,
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary.withOpacity(0.2),
+                        theme.colorScheme.secondary.withOpacity(0.2),
+                      ],
+                    ),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.08) : theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.group_rounded,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                )
+              : FutureBuilder<UserProfile?>(
+                  future: MessagingService.getOtherUserInPrivateChat(_chatRoom!),
+                  builder: (context, snapshot) {
+                    return UserAvatar(
+                      user: snapshot.data,
+                      size: 44,
+                      showGradientBorder: true,
+                    );
+                  },
                 ),
-              ),
-            ),
-          ),
         ),
         const SizedBox(width: 12),
         Flexible(
@@ -1007,20 +1181,35 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                widget.chatRoom.name.isEmpty && widget.chatRoom.type != ChatType.group
-                    ? 'Chat'
-                    : widget.chatRoom.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                  fontSize: 16,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+              _chatRoom!.type == ChatType.private && _chatRoom!.name.isEmpty
+                  ? FutureBuilder<UserProfile?>(
+                      future: MessagingService.getOtherUserInPrivateChat(_chatRoom!),
+                      builder: (context, snapshot) {
+                        final otherUser = snapshot.data;
+                        final displayName = otherUser?.displayName ?? 'Chat';
+                        return Text(
+                          displayName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    )
+                  : Text(
+                      _chatRoom!.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                        fontSize: 16,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
               const SizedBox(height: 2),
               StreamBuilder<List<String>>(
-                stream: MessagingService.typingUsers(widget.chatRoom.id),
+                stream: MessagingService.typingUsers(_chatRoom!.id),
                 builder: (context, snapshot) {
                   final usersTyping = snapshot.data?.where((id) => id != _currentUser?.uid).toList() ?? [];
                   String subtitle;
@@ -1031,8 +1220,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
                         ? 'typing...'
                         : '${usersTyping.length} typing...';
                     subtitleColor = theme.colorScheme.primary;
-                  } else if (widget.chatRoom.type == ChatType.group) {
-                    subtitle = '${widget.chatRoom.memberIds.length} members';
+                  } else if (_chatRoom!.type == ChatType.group) {
+                    subtitle = '${_chatRoom!.memberIds.length} members';
                     subtitleColor = theme.colorScheme.onSurface.withOpacity(0.6);
                   } else {
                     subtitle = 'online';
@@ -1046,7 +1235,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
                       key: ValueKey(subtitle),
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (usersTyping.isEmpty && widget.chatRoom.type != ChatType.group)
+                        if (usersTyping.isEmpty && _chatRoom?.type != ChatType.group)
                           Container(
                             width: 6,
                             height: 6,
@@ -1079,12 +1268,14 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> with TickerProvider
   }
 
   void _showChatInfo() {
-    Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatInfoPage(chatRoom: widget.chatRoom),
-        )
-    );
+    if (_chatRoom != null) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatInfoPage(chatRoom: _chatRoom!),
+          )
+      );
+    }
   }
 }
 
@@ -1100,8 +1291,6 @@ class _ChatRoomBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
-    
-    print('ChatRoomBackgroundPainter paint called - Size: ${size.width}x${size.height}');
 
     // Beautiful bubble colors with enhanced visibility for chat
     final bubbleColors = [
@@ -1219,10 +1408,12 @@ class _ChatRoomBackgroundPainter extends CustomPainter {
       paint.color = bubbleColors[(i + 3) % bubbleColors.length];
       canvas.drawCircle(smallPositions[i], 25.0, paint);
     }
-
-    print('Painted ${3 + mediumPositions.length + smallPositions.length} chat room bubbles');
   }
 
   @override
-  bool shouldRepaint(_ChatRoomBackgroundPainter oldDelegate) => true;
+  bool shouldRepaint(_ChatRoomBackgroundPainter oldDelegate) {
+    // Only repaint when theme (isDark) changes
+    // Animation repaints are handled by super(repaint: animation)
+    return isDark != oldDelegate.isDark;
+  }
 }

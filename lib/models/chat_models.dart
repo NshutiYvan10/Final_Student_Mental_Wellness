@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ChatType {
   private,
@@ -30,6 +31,9 @@ class ChatRoom {
   final DateTime? lastMessageAt;
   final Map<String, dynamic> settings;
   final bool isPrivate;
+  final List<String> pinnedBy;
+  final List<String> mutedBy;
+  final List<String> archivedBy;
 
   ChatRoom({
     required this.id,
@@ -43,6 +47,9 @@ class ChatRoom {
     this.lastMessageAt,
     this.settings = const {},
     this.isPrivate = false,
+    this.pinnedBy = const [],
+    this.mutedBy = const [],
+    this.archivedBy = const [],
   });
 
   ChatRoom copyWith({
@@ -57,6 +64,9 @@ class ChatRoom {
     DateTime? lastMessageAt,
     Map<String, dynamic>? settings,
     bool? isPrivate,
+    List<String>? pinnedBy,
+    List<String>? mutedBy,
+    List<String>? archivedBy,
   }) {
     return ChatRoom(
       id: id ?? this.id,
@@ -70,6 +80,9 @@ class ChatRoom {
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       settings: settings ?? this.settings,
       isPrivate: isPrivate ?? this.isPrivate,
+      pinnedBy: pinnedBy ?? this.pinnedBy,
+      mutedBy: mutedBy ?? this.mutedBy,
+      archivedBy: archivedBy ?? this.archivedBy,
     );
   }
 
@@ -85,6 +98,9 @@ class ChatRoom {
         'lastMessageAt': lastMessageAt?.toIso8601String(),
         'settings': settings,
         'isPrivate': isPrivate,
+        'pinnedBy': pinnedBy,
+        'mutedBy': mutedBy,
+        'archivedBy': archivedBy,
       };
 
   factory ChatRoom.fromMap(Map<String, dynamic> map) => ChatRoom(
@@ -98,12 +114,17 @@ class ChatRoom {
         ),
         memberIds: List<String>.from(map['memberIds'] ?? []),
         createdBy: map['createdBy'] as String?,
-        createdAt: DateTime.parse(map['createdAt'] as String),
-        lastMessageAt: map['lastMessageAt'] != null 
-            ? DateTime.parse(map['lastMessageAt'] as String) 
-            : null,
+        createdAt: map['createdAt'] is Timestamp
+          ? (map['createdAt'] as Timestamp).toDate()
+          : DateTime.parse(map['createdAt'] as String),
+        lastMessageAt: map['lastMessageAt'] is Timestamp
+          ? (map['lastMessageAt'] as Timestamp).toDate()
+          : (map['lastMessageAt'] != null ? DateTime.parse(map['lastMessageAt'] as String) : null),
         settings: Map<String, dynamic>.from(map['settings'] ?? {}),
         isPrivate: map['isPrivate'] as bool? ?? false,
+        pinnedBy: List<String>.from(map['pinnedBy'] ?? []),
+        mutedBy: List<String>.from(map['mutedBy'] ?? []),
+        archivedBy: List<String>.from(map['archivedBy'] ?? []),
       );
 }
 
@@ -197,10 +218,16 @@ class ChatMessage {
           (e) => e.name == map['type'],
           orElse: () => MessageType.text,
         ),
-        createdAt: DateTime.parse(map['createdAt'] as String),
-        editedAt: map['editedAt'] != null 
-            ? DateTime.parse(map['editedAt'] as String) 
-            : null,
+        createdAt: map['createdAt'] == null
+          ? DateTime.now()
+          : map['createdAt'] is Timestamp
+            ? (map['createdAt'] as Timestamp).toDate()
+            : DateTime.parse(map['createdAt'] as String),
+        editedAt: map['editedAt'] == null
+          ? null
+          : map['editedAt'] is Timestamp
+            ? (map['editedAt'] as Timestamp).toDate()
+            : DateTime.parse(map['editedAt'] as String),
         isEdited: map['isEdited'] as bool? ?? false,
         reactions: Map<String, List<String>>.from(
           (map['reactions'] as Map?)?.map(
