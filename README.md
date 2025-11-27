@@ -753,9 +753,8 @@ Special thanks to my Mobile Programming instructor, Regis Safi, for introducing 
 
 ### Crisis Resources
 If you're experiencing a mental health crisis, please reach out immediately:
-- **National Suicide Prevention Lifeline**: 988
-- **Crisis Text Line**: Text HOME to 741741
-- **Emergency Services**: 911
+- **National Suicide Prevention Lifeline**: 114
+- **Emergency Services**: 112
 
 ---
 
