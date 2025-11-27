@@ -10,7 +10,7 @@
 
 *A comprehensive mental wellness platform designed specifically for students, combining AI-powered insights, peer support, and mindfulness practices in a beautiful, modern interface.*
 
-[Features](#-features) • [Screenshots](#-screenshots) • [Installation](#-installation) • [Demo](#-demo-video) • [Download APK](#-download-apk)
+[Features](#-features) • [Screenshots](#-app-interface-showcase) • [Installation](#-installation--setup) • [Demo](#-demo-video) • [Download APK](#-download-apk)
 
 </div>
 
