@@ -46,12 +46,15 @@ To create an accessible, stigma-free platform where students can prioritize thei
 **Experience the complete feature tour with smooth animations**
 
 **Demo Highlights:**
+<div align="center">
   🚀 Smooth onboarding experience with mood selection<br>
   📊 Real-time mood tracking with AI insights<br>
   🤖 Intelligent journal analysis with sentiment detection<br>
   💬 Seamless mentor connection and group messaging<br>
   🧘 Interactive meditation sessions with progress tracking<br>
   📈 Comprehensive analytics dashboard with beautiful visualizations
+     
+</div>
 
 </div>
 
